@@ -3,13 +3,13 @@
 [English](README.md) | **简体中文**
 
 > [!NOTE]
-> Gnome 是 [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) 的定制分支，遵循同样的 GPLv3 许可证开源。本项目与 [✍️memos](https://github.com/usememos/memos) 及 Moe Memos 项目没有任何隶属关系。
+> Gnome 以 [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) 为基座与灵感来源构建，遵循同样的 GPLv3 许可证开源。本项目与 [✍️memos](https://github.com/usememos/memos) 及 Moe Memos 项目没有任何隶属关系。
 
-Gnome 是一款帮助你记录想法与灵感的 App，在 Moe Memos 完整功能之上，提供了 flomo 风格的低摩擦速记体验。
+Gnome 是一款帮助你记录想法与灵感的 App，提供 flomo 风格的低摩擦速记体验，并跟随 [✍️memos](https://github.com/usememos/memos) 最新稳定版持续适配。
 
 你可以连接自架设的 [✍️memos](https://github.com/usememos/memos) 服务器使用 Gnome，也可以完全在本地使用（无需服务器）。
 
-**注意：Gnome 当前支持 Memos 0.21.0 以及 Memos 0.27.0 至 0.30.0。Memos 更新可能引入不兼容的 API 变更。**
+**兼容性：Gnome 跟随 Memos 最新稳定版适配（当前适配至 0.30.x）。同时支持 Memos 0.21.0 与 0.27.0 – 0.30.0；0.22 – 0.26 不受支持。**
 
 ## 功能
 
@@ -54,8 +54,8 @@ Gnome 使用 Kotlin 和 Jetpack Compose 开发，欢迎参与贡献。
 
 ## 致谢
 
-- [✍️memos](https://github.com/usememos/memos) —— 开源、自托管的轻量级笔记服务，本客户端所连接的服务端项目。
-- [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) —— 由 [@mudkipme](https://github.com/mudkipme) 开发的原版 Android 客户端。Gnome 基于它定制而来，感谢原作者的出色工作。
+- [✍️memos](https://github.com/usememos/memos) —— 开源、自托管的轻量级笔记服务，Gnome 所连接并持续跟随的服务端项目。
+- [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) —— [@mudkipme](https://github.com/mudkipme) 开发的 Android Memos 客户端，是 Gnome 的基座参考与灵感来源。感谢原作者的出色工作。
 
 ## 许可证
 

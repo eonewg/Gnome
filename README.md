@@ -3,13 +3,13 @@
 **English** | [简体中文](README.zh-CN.md)
 
 > [!NOTE]
-> Gnome is a customized fork of [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid), published under the same GPLv3 license. It is not affiliated with either the [✍️memos](https://github.com/usememos/memos) or the Moe Memos project.
+> Gnome is built on [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) as its base and original inspiration, and is published under the same GPLv3 license. It is not affiliated with either the [✍️memos](https://github.com/usememos/memos) or the Moe Memos project.
 
-Gnome is an app to help you capture thoughts and ideas, with a flomo-style, low-friction quick capture experience on top of everything Moe Memos offers.
+Gnome is an app to help you capture thoughts and ideas, with a flomo-style, low-friction quick capture experience. It is developed against the latest stable [✍️memos](https://github.com/usememos/memos) server.
 
 You can use Gnome with either a self-hosted [✍️memos](https://github.com/usememos/memos) server or locally on your device (no server required).
 
-**Note: Gnome currently supports Memos 0.21.0 and Memos 0.27.0 to 0.30.0. Memos updates may introduce breaking API changes.**
+**Compatibility: Gnome tracks the latest stable Memos release (currently validated up to 0.30.x). Memos 0.21.0 and 0.27.0 – 0.30.0 are also supported; 0.22 – 0.26 are not.**
 
 ## Features
 
@@ -54,8 +54,8 @@ Gnome is developed with Kotlin and Jetpack Compose. Contributions are appreciate
 
 ## Acknowledgments
 
-- [✍️memos](https://github.com/usememos/memos) — the open-source, self-hosted memo hub this client connects to.
-- [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) — the original Android client by [@mudkipme](https://github.com/mudkipme). Gnome is a customized fork of it and would not exist without it.
+- [✍️memos](https://github.com/usememos/memos) — the open-source, self-hosted memo hub Gnome is built for and follows.
+- [Moe Memos](https://github.com/mudkipme/MoeMemosAndroid) — the Android client by [@mudkipme](https://github.com/mudkipme), which serves as Gnome's codebase base and inspiration. Gnome would not exist without it.
 
 ## License
 
