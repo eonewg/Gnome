@@ -106,3 +106,15 @@ lint/tmp/
 
 # Serena (Claude Code MCP server)
 .serena/
+
+# Local AI workflow state
+.spec-workflow/
+
+# Local working artifacts
+artifacts/
+
+# flomo migration: personal export data and caches
+migration/*.zip
+migration/*.state.json
+__pycache__/
+*.pyc

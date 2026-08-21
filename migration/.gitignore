@@ -1,0 +1,5 @@
+*.zip
+*.state.json
+.env
+__pycache__/
+
