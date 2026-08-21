@@ -7,6 +7,7 @@
     <string name="menu">Menu</string>
     <string name="search_hint">Search…</string>
     <string name="new_memo">New Memo</string>
+    <string name="quick_note">Quick Note</string>
     <string name="compose">Compose</string>
     <string name="remove">Remove</string>
     <string name="resources">Resources</string>
@@ -44,8 +45,8 @@
     <string name="add_task">Add Task</string>
     <string name="add_image">Add Image</string>
     <string name="take_photo">Take Photo</string>
-    <string name="post">Post</string>
-    <string name="any_thoughts">Any thoughts…</string>
+    <string name="post">Send</string>
+    <string name="any_thoughts">Capture this thought…</string>
     <string name="input_login_information">Please input the login information of your \n[✍️memos](https://github.com/usememos/memos) server.</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
@@ -134,4 +135,25 @@
     <string name="pinned_only">Show only pinned items.</string>
     <string name="max_items">Maximum items to show</string>
     <string name="refresh">Refresh</string>
+    <string name="done">Done</string>
+    <string name="more_options">More options</string>
+    <string name="select_memos">Select memos</string>
+    <string name="sort_order">Sort order</string>
+    <string name="sort_created_newest">Creation time, newest first</string>
+    <string name="sort_created_oldest">Creation time, oldest first</string>
+    <string name="sort_updated_newest">Edit time, newest first</string>
+    <string name="sort_updated_oldest">Edit time, oldest first</string>
+    <string name="selected_memos_count">%1$d memos selected</string>
+    <string name="add_tag">Add tag</string>
+    <string name="copy_all">Copy all</string>
+    <string name="memos_copied">Copied %1$d memos</string>
+    <string name="tag_added_to_memos">Tag added to %1$d memos</string>
+    <string name="batch_operation_failed">%1$d operations failed</string>
+    <string name="memos_deleted">Deleted %1$d memos</string>
+    <string name="delete_selected_memos">Delete %1$d selected memos?</string>
+    <string name="delete_selected_memos_message">This action cannot be undone.</string>
+    <string name="tag_name">Tag name</string>
+    <string name="tag_name_hint">No # needed</string>
+    <string name="invalid_tag_name">Tags cannot be empty or contain spaces or #.</string>
+    <string name="existing_tags">Existing tags</string>
 </resources>

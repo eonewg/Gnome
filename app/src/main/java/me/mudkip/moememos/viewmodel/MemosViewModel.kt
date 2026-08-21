@@ -4,10 +4,8 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.skydoves.sandwich.ApiResponse
@@ -16,12 +14,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.mudkip.moememos.data.constant.MemosVersionSupport
@@ -35,6 +33,7 @@ import me.mudkip.moememos.data.service.AccountService
 import me.mudkip.moememos.data.service.MemoService
 import me.mudkip.moememos.ext.getErrorMessage
 import me.mudkip.moememos.ext.string
+import me.mudkip.moememos.util.extractCustomTags
 import me.mudkip.moememos.widget.WidgetUpdater
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -47,9 +46,9 @@ class MemosViewModel @Inject constructor(
     @param:ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
-    var memos = mutableStateListOf<MemoEntity>()
+    var memos by mutableStateOf<List<MemoEntity>>(emptyList())
         private set
-    var tags = mutableStateListOf<String>()
+    var tags by mutableStateOf<List<String>>(emptyList())
         private set
     var errorMessage: String? by mutableStateOf(null)
         private set
@@ -66,45 +65,48 @@ class MemosViewModel @Inject constructor(
         memoService.syncStatus.stateIn(viewModelScope, SharingStarted.Eagerly, SyncStatus())
 
     init {
-        snapshotFlow { memos.toList() }
-            .onEach { matrix = calculateMatrix() }
-            .launchIn(viewModelScope)
-
         viewModelScope.launch {
-            loadMemosSnapshot()
-
-            memoService.syncStatus
-                .map { it.syncing }
+            var hasPresentedLocalSnapshot = false
+            combine(memoService.memos, memoService.syncStatus) { latestMemos, status ->
+                latestMemos to status
+            }
                 .distinctUntilChanged()
-                .collectLatest { syncing ->
-                    if (syncing) {
-                        return@collectLatest
-                    }
-                    memoService.memos.collectLatest { latestMemos ->
+                .collectLatest { (latestMemos, status) ->
+                    if (!hasPresentedLocalSnapshot || !status.syncing) {
                         applyMemos(latestMemos)
+                        hasPresentedLocalSnapshot = true
                     }
                 }
         }
     }
 
-    private suspend fun loadMemosSnapshot() {
+    suspend fun refreshLocalSnapshot() = withContext(viewModelScope.coroutineContext) {
         when (val response = memoService.getRepository().listMemos()) {
-            is ApiResponse.Success -> {
-                applyMemos(response.data)
-            }
-            else -> {
-                errorMessage = response.getErrorMessage()
-            }
+            is ApiResponse.Success -> applyMemos(response.data)
+            else -> errorMessage = response.getErrorMessage()
         }
     }
 
-    suspend fun refreshLocalSnapshot() = withContext(viewModelScope.coroutineContext) {
-        loadMemosSnapshot()
-    }
-
-    private fun applyMemos(latestMemos: List<MemoEntity>) {
-        memos.clear()
-        memos.addAll(latestMemos)
+    private suspend fun applyMemos(latestMemos: List<MemoEntity>) {
+        val snapshot = latestMemos.toList()
+        if (memos != snapshot) {
+            val (preparedMatrix, preparedTags) = withContext(Dispatchers.Default) {
+                val matrix = calculateMatrix(snapshot)
+                val tags = snapshot
+                    .asSequence()
+                    .flatMap { extractCustomTags(it.content).asSequence() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .sorted()
+                    .toList()
+                matrix to tags
+            }
+            memos = snapshot
+            matrix = preparedMatrix
+            if (tags != preparedTags) {
+                tags = preparedTags
+            }
+        }
         errorMessage = null
     }
 
@@ -165,8 +167,10 @@ class MemosViewModel @Inject constructor(
 
     fun loadTags() = viewModelScope.launch {
         memoService.getRepository().listTags().suspendOnSuccess {
-            tags.clear()
-            tags.addAll(data)
+            val snapshot = data.filter { it.isNotBlank() }.distinct()
+            if (tags != snapshot) {
+                tags = snapshot
+            }
         }
     }
 
@@ -188,7 +192,7 @@ class MemosViewModel @Inject constructor(
 
     suspend fun archiveMemo(memoIdentifier: String) = withContext(viewModelScope.coroutineContext) {
         memoService.getRepository().archiveMemo(memoIdentifier).suspendOnSuccess {
-            memos.removeIf { it.identifier == memoIdentifier }
+            memos = memos.filterNot { it.identifier == memoIdentifier }
             // Update widgets after archiving a memo
             WidgetUpdater.updateWidgets(appContext)
         }
@@ -196,7 +200,7 @@ class MemosViewModel @Inject constructor(
 
     suspend fun deleteMemo(memoIdentifier: String) = withContext(viewModelScope.coroutineContext) {
         memoService.getRepository().deleteMemo(memoIdentifier).suspendOnSuccess {
-            memos.removeIf { it.identifier == memoIdentifier }
+            memos = memos.filterNot { it.identifier == memoIdentifier }
             // Update widgets after deleting a memo
             WidgetUpdater.updateWidgets(appContext)
         }
@@ -216,14 +220,14 @@ class MemosViewModel @Inject constructor(
     private fun updateMemo(memo: MemoEntity) {
         val index = memos.indexOfFirst { it.identifier == memo.identifier }
         if (index != -1) {
-            memos[index] = memo
+            memos = memos.toMutableList().also { it[index] = memo }
         }
     }
 
-    private fun calculateMatrix(): List<DailyUsageStat> {
+    private fun calculateMatrix(source: List<MemoEntity>): List<DailyUsageStat> {
         val countMap = HashMap<LocalDate, Int>()
 
-        for (memo in memos) {
+        for (memo in source) {
             val date = memo.date.atZone(OffsetDateTime.now().offset).toLocalDate()
             countMap[date] = (countMap[date] ?: 0) + 1
         }

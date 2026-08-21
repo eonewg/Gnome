@@ -1,5 +1,6 @@
 package me.mudkip.moememos.ui.component
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.Home
@@ -25,22 +28,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.model.Account
 import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ui.page.common.LocalRootNavController
 import me.mudkip.moememos.ui.page.common.RouteName
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
 import java.net.URLEncoder
@@ -52,16 +54,14 @@ import java.util.Locale
 @Composable
 fun SideDrawer(
     memosNavController: NavHostController,
-    drawerState: DrawerState? = null
+    drawerState: DrawerState? = null,
+    loadTags: Boolean = true,
 ) {
     val weekDays = remember {
         val day = WeekFields.of(Locale.getDefault()).firstDayOfWeek
         List(DayOfWeek.entries.size) { index ->
             day.plus(index.toLong()).getDisplayName(TextStyle.SHORT, Locale.getDefault())
         }
-    }
-    var showHeatMap by remember {
-        mutableStateOf(false)
     }
     val scope = rememberCoroutineScope()
     val memosViewModel = LocalMemos.current
@@ -71,6 +71,16 @@ fun SideDrawer(
     val rootNavController = LocalRootNavController.current
     val navBackStackEntry by memosNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val colors = MoeMemosDesign.colors
+    val drawerItemColors = NavigationDrawerItemDefaults.colors(
+        selectedContainerColor = colors.tagBackground,
+        selectedIconColor = colors.tagForeground,
+        selectedTextColor = colors.textPrimary,
+        unselectedContainerColor = Color.Transparent,
+        unselectedIconColor = colors.textSecondary,
+        unselectedTextColor = colors.textPrimary,
+    )
+    val drawerItemShape = RoundedCornerShape(14.dp)
 
     fun isSelected(route: String): Boolean {
         return currentDestination?.hierarchy?.any { it.route == route } == true
@@ -84,7 +94,7 @@ fun SideDrawer(
         return currentTag == tag || currentTag == encodedTag
     }
 
-    LazyColumn {
+    LazyColumn(modifier = Modifier.background(colors.cardBackground)) {
         item {
             Stats()
         }
@@ -112,9 +122,7 @@ fun SideDrawer(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline)
                 }
-                if (showHeatMap) {
-                    Heatmap()
-                }
+                Heatmap()
             }
         }
 
@@ -122,6 +130,7 @@ fun SideDrawer(
             Text(
                 R.string.moe_memos.string,
                 style = MaterialTheme.typography.titleMedium,
+                color = colors.textPrimary,
                 modifier = Modifier.padding(20.dp)
             )
         }
@@ -139,6 +148,8 @@ fun SideDrawer(
                         drawerState?.close()
                     }
                 },
+                shape = drawerItemShape,
+                colors = drawerItemColors,
                 modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
@@ -157,6 +168,8 @@ fun SideDrawer(
                             drawerState?.close()
                         }
                     },
+                    shape = drawerItemShape,
+                    colors = drawerItemColors,
                     modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
             }
@@ -172,6 +185,8 @@ fun SideDrawer(
                         rootNavController.navigate(RouteName.RESOURCE)
                     }
                 },
+                shape = drawerItemShape,
+                colors = drawerItemColors,
                 modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
@@ -189,6 +204,8 @@ fun SideDrawer(
                         drawerState?.close()
                     }
                 },
+                shape = drawerItemShape,
+                colors = drawerItemColors,
                 modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
@@ -203,37 +220,44 @@ fun SideDrawer(
                         rootNavController.navigate(RouteName.SETTINGS)
                     }
                 },
+                shape = drawerItemShape,
+                colors = drawerItemColors,
                 modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
 
         item {
-            HorizontalDivider(Modifier.padding(vertical = 10.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 10.dp),
+                color = colors.divider,
+            )
         }
 
         item {
             Text(
                 R.string.tags.string,
                 style = MaterialTheme.typography.titleMedium,
+                color = colors.textPrimary,
                 modifier = Modifier.padding(20.dp)
             )
         }
 
-        memosViewModel.tags.toList().forEach { tag ->
-            item {
-                TagDrawerItem(
-                    tag = tag,
-                    selected = isTagSelected(tag),
-                    memosNavController = memosNavController,
-                    drawerState = drawerState
-                )
-            }
+        items(
+            items = memosViewModel.tags,
+            key = { it },
+        ) { tag ->
+            TagDrawerItem(
+                tag = tag,
+                selected = isTagSelected(tag),
+                memosNavController = memosNavController,
+                drawerState = drawerState
+            )
         }
     }
 
-    LaunchedEffect(Unit) {
-        memosViewModel.loadTags()
-        delay(0)
-        showHeatMap = true
+    LaunchedEffect(memosViewModel, loadTags) {
+        if (loadTags) {
+            memosViewModel.loadTags()
+        }
     }
 }

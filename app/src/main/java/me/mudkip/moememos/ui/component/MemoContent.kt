@@ -1,6 +1,7 @@
 package me.mudkip.moememos.ui.component
 
 import android.content.Intent
+import android.net.Uri
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -17,7 +18,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.LinkInteractionListener
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import me.mudkip.moememos.R
@@ -27,7 +35,10 @@ import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ui.page.common.LocalRootNavController
 import me.mudkip.moememos.ui.page.common.RouteName
 import me.mudkip.moememos.ui.media.MediaViewerActivity
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import me.mudkip.moememos.viewmodel.LocalUserState
+import me.mudkip.moememos.util.findCustomTagMatches
+import me.mudkip.moememos.util.getCustomTagName
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -43,13 +54,15 @@ fun MemoContent(
     memo: MemoRepresentable,
     previewMode: Boolean = false,
     checkboxChange: (checked: Boolean, startOffset: Int, endOffset: Int) -> Unit = { _, _, _ -> },
-    onViewMore: (() -> Unit)? = null,
+    isPreviewExpanded: Boolean = false,
+    onPreviewExpandedChange: ((Boolean) -> Unit)? = null,
     selectable: Boolean = false,
     onTagClick: ((String) -> Unit)? = null
 ) {
     val rootNavController = LocalRootNavController.current
-    val (text, previewed) = remember(memo.content, previewMode) {
-        if (previewMode) {
+    val colors = MoeMemosDesign.colors
+    val (text, previewed) = remember(memo.content, previewMode, isPreviewExpanded) {
+        if (previewMode && !isPreviewExpanded) {
             extractPreviewContent(markdownText = memo.content)
         } else {
             Pair(memo.content, false)
@@ -65,39 +78,146 @@ fun MemoContent(
     }
 
     Column(
-        modifier = Modifier.padding(start = 15.dp, end = 15.dp, bottom = 10.dp)
+        modifier = Modifier.padding(start = 18.dp, end = 18.dp, bottom = 14.dp)
     ) {
-        Markdown(
-            text,
-            imageBaseUrl = LocalUserState.current.host,
-            checkboxChange = checkboxChange,
-            selectable = selectable,
-            onTagClick = handleTagClick
-        )
+        if (selectable || requiresRichMarkdown(text)) {
+            Markdown(
+                text,
+                imageBaseUrl = LocalUserState.current.host,
+                checkboxChange = checkboxChange,
+                selectable = selectable,
+                onTagClick = handleTagClick
+            )
+        } else {
+            PlainMemoText(
+                text = text,
+                onTagClick = handleTagClick,
+            )
+        }
 
         MemoResourceContent(memo)
 
-        if (previewed && onViewMore != null) {
-            Row {
+        if ((previewed || previewMode && isPreviewExpanded) && onPreviewExpandedChange != null) {
+            Row(modifier = Modifier.padding(top = 10.dp)) {
                 Text(
-                    text = R.string.view_more.string,
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.Underline),
-                    modifier = Modifier.clickable(onClick = onViewMore)
+                    text = if (isPreviewExpanded) R.string.collapse.string else R.string.view_more.string,
+                    color = colors.tagForeground,
+                    style = MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.None),
+                    modifier = Modifier.clickable {
+                        onPreviewExpandedChange(!isPreviewExpanded)
+                    }
                 )
             }
         }
     }
 }
 
+@Composable
+private fun PlainMemoText(
+    text: String,
+    onTagClick: (String) -> Unit,
+) {
+    val colors = MoeMemosDesign.colors
+    val uriHandler = LocalUriHandler.current
+    val tagStyle = TextLinkStyles(
+        style = SpanStyle(
+            color = colors.tagForeground,
+            background = colors.tagBackground,
+            textDecoration = TextDecoration.None,
+        )
+    )
+    val linkListener = remember(onTagClick, uriHandler) {
+        LinkInteractionListener { link ->
+            val url = (link as? LinkAnnotation.Url)?.url ?: return@LinkInteractionListener
+            if (url.startsWith(PlainTagLinkPrefix)) {
+                onTagClick(Uri.decode(url.removePrefix(PlainTagLinkPrefix)))
+            } else {
+                uriHandler.openUri(url)
+            }
+        }
+    }
+    val annotatedText = remember(text, tagStyle, linkListener) {
+        buildAnnotatedString {
+            var cursor = 0
+            findCustomTagMatches(text).forEach { match ->
+                val start = match.range.first
+                val endExclusive = match.range.last + 1
+                if (start > cursor) {
+                    append(text.substring(cursor, start))
+                }
+                val tag = getCustomTagName(match)
+                withLink(
+                    LinkAnnotation.Url(
+                        url = PlainTagLinkPrefix + Uri.encode(tag),
+                        styles = tagStyle,
+                        linkInteractionListener = linkListener,
+                    )
+                ) {
+                    append("\u2009")
+                    append(match.value)
+                    append("\u2009")
+                }
+                cursor = endExclusive
+            }
+            if (cursor < text.length) {
+                append(text.substring(cursor))
+            }
+        }
+    }
+
+    Text(
+        text = annotatedText,
+        style = MaterialTheme.typography.bodyLarge,
+        color = colors.textPrimary,
+    )
+}
+
+internal fun requiresRichMarkdown(text: String): Boolean {
+    if (MarkdownLinePrefix.containsMatchIn(text) || MarkdownEmphasisPattern.containsMatchIn(text)) {
+        return true
+    }
+    return MarkdownInlineMarkers.any(text::contains)
+}
+
 private const val PREVIEW_UNBREAKABLE_COST = 100
+private const val PlainTagLinkPrefix = "moememos://plain-tag/"
+private val MarkdownLinePrefix = Regex("(?m)^\\s*(?:#{1,6}\\s|[-+*]\\s|\\d+[.)]\\s|>|~~~)")
+private val MarkdownEmphasisPattern = Regex("(?:^|[\\s(])(?:\\*[^*\\n]+\\*|_[^_\\n]+_)")
+private val MarkdownInlineMarkers = listOf(
+    "http://",
+    "https://",
+    "**",
+    "__",
+    "~~",
+    "\u0060",
+    "![",
+    "](",
+    "[ ]",
+    "[x]",
+    "[X]",
+    "<",
+    "|",
+    "\\",
+)
 private enum class PreviewAppendKind {
     NONE,
     TEXT,
     UNBREAKABLE
 }
 
-fun extractPreviewContent(markdownText: String, maxLength: Int = 500): Pair<String, Boolean> {
+fun extractPreviewContent(markdownText: String, maxLength: Int = 220): Pair<String, Boolean> {
+    if (markdownText.length <= maxLength) {
+        return Pair(markdownText, false)
+    }
+
+    if (!requiresRichMarkdown(markdownText)) {
+        var endIndex = maxLength.coerceAtMost(markdownText.length)
+        if (endIndex > 0 && Character.isHighSurrogate(markdownText[endIndex - 1])) {
+            endIndex -= 1
+        }
+        return Pair(markdownText.substring(0, endIndex).trimEnd() + "…", true)
+    }
+
     val node = MarkdownParser(GFMFlavourDescriptor()).parse(
         MarkdownElementTypes.MARKDOWN_FILE,
         markdownText,
@@ -261,8 +381,8 @@ fun MemoResourceContent(memo: MemoRepresentable) {
                                 url = imageList[index].localUri ?: imageList[index].uri,
                                 modifier = Modifier
                                     .aspectRatio(1f)
-                                    .padding(2.dp)
-                                    .clip(RoundedCornerShape(4.dp)),
+                                    .padding(3.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
                                 resourceIdentifier = (imageList[index] as? ResourceEntity)?.identifier,
                                 onClick = {
                                     context.startActivity(

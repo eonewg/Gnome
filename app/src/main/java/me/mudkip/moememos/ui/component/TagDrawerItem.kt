@@ -1,6 +1,7 @@
 package me.mudkip.moememos.ui.component
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.DrawerState
@@ -11,9 +12,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.ui.page.common.RouteName
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import java.net.URLEncoder
 
 @Composable
@@ -24,6 +28,7 @@ fun TagDrawerItem(
     drawerState: DrawerState? = null
 ) {
     val scope = rememberCoroutineScope()
+    val colors = MoeMemosDesign.colors
 
     NavigationDrawerItem(
         label = { Text(tag) },
@@ -38,6 +43,15 @@ fun TagDrawerItem(
                 drawerState?.close()
             }
         },
+        shape = RoundedCornerShape(14.dp),
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = colors.tagBackground,
+            selectedIconColor = colors.tagForeground,
+            selectedTextColor = colors.textPrimary,
+            unselectedContainerColor = Color.Transparent,
+            unselectedIconColor = colors.textSecondary,
+            unselectedTextColor = colors.textPrimary,
+        ),
         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
     )
 }

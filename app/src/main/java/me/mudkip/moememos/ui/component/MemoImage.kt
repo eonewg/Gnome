@@ -14,13 +14,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
-import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.AsyncImage
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.viewmodel.LocalMemos
-import me.mudkip.moememos.viewmodel.LocalUserState
 import timber.log.Timber
 import java.io.File
 
@@ -34,20 +32,10 @@ fun MemoImage(
 ) {
     var diskCacheFile: File? by remember { mutableStateOf(null) }
     val context = LocalContext.current
-    val userStateViewModel = LocalUserState.current
     val memosViewModel = LocalMemos.current
     val scope = rememberCoroutineScope()
-    val imageLoader = remember(context, userStateViewModel.okHttpClient) {
-        ImageLoader.Builder(context)
-            .components {
-                add(
-                    OkHttpNetworkFetcherFactory(
-                        callFactory = { userStateViewModel.okHttpClient }
-                    )
-                )
-            }
-            .build()
-    }
+    val imageLoader = remember(context) { SingletonImageLoader.get(context) }
+
     val modelUri = remember(url) { url.toUri() }
     val modelFile = remember(url) {
         modelUri.takeIf { it.scheme == "file" }?.path?.let(::File)
@@ -92,7 +80,7 @@ fun MemoImage(
             val diskCacheKey = state.result.diskCacheKey
 
             if (diskCache != null && diskCacheKey != null) {
-                val downloadedFile = diskCache.openSnapshot(diskCacheKey)?.data?.toFile()
+                val downloadedFile = diskCache.openSnapshot(diskCacheKey)?.use { it.data.toFile() }
                 diskCacheFile = downloadedFile
                 val shouldPersistDownloadedFile = resourceIdentifier != null &&
                     downloadedFile != null &&

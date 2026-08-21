@@ -7,6 +7,7 @@
     <string name="menu">Menu</string>
     <string name="search_hint">Ricerca…</string>
     <string name="new_memo">Nuovo Memo</string>
+    <string name="quick_note">Nota rapida</string>
     <string name="compose">Componi</string>
     <string name="remove">Rimuovi</string>
     <string name="resources">Risorse</string>

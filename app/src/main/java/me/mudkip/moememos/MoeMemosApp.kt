@@ -6,11 +6,20 @@ import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.HiltAndroidApp
+import me.mudkip.moememos.data.service.AccountService
 import me.mudkip.moememos.ui.security.AppLockSession
+import okhttp3.Call
+import javax.inject.Inject
 
 @HiltAndroidApp
-class MoeMemosApp: Application() {
+class MoeMemosApp : Application(), SingletonImageLoader.Factory {
+    @Inject
+    lateinit var accountService: AccountService
+
     companion object {
         @SuppressLint("StaticFieldLeak")
         lateinit var CONTEXT: Context
@@ -33,4 +42,17 @@ class MoeMemosApp: Application() {
             }
         })
     }
+
+    override fun newImageLoader(context: Context): ImageLoader =
+        ImageLoader.Builder(context.applicationContext)
+            .components {
+                add(
+                    OkHttpNetworkFetcherFactory(
+                        callFactory = {
+                            Call.Factory { request -> accountService.httpClient.newCall(request) }
+                        }
+                    )
+                )
+            }
+            .build()
 }

@@ -16,7 +16,9 @@ import me.mudkip.moememos.viewmodel.LocalUserState
 @Composable
 fun MemosNavigation(
     drawerState: DrawerState? = null,
-    navController: NavHostController
+    navController: NavHostController,
+    quickMemoRequestId: Long = 0L,
+    onMemoInputActiveChange: (Boolean) -> Unit = {},
 ) {
     val userStateViewModel = LocalUserState.current
     val currentAccount by userStateViewModel.currentAccount.collectAsState()
@@ -32,6 +34,8 @@ fun MemosNavigation(
             MemosHomePage(
                 drawerState = drawerState,
                 navController = navController,
+                quickMemoRequestId = quickMemoRequestId,
+                onMemoInputActiveChange = onMemoInputActiveChange,
             )
         }
 
@@ -74,6 +78,17 @@ fun MemosNavigation(
 
         composable(RouteName.SEARCH) {
             SearchPage(navController = navController)
+        }
+    }
+
+    LaunchedEffect(quickMemoRequestId) {
+        if (quickMemoRequestId > 0L && navController.currentDestination?.route != RouteName.MEMOS) {
+            navController.navigate(RouteName.MEMOS) {
+                popUpTo(RouteName.MEMOS) {
+                    inclusive = false
+                }
+                launchSingleTop = true
+            }
         }
     }
 }

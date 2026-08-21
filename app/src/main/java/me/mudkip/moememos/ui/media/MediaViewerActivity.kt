@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.widget.VideoView
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.VectorConverter
@@ -74,9 +73,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.FragmentActivity
 import coil3.ImageLoader
+import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.AsyncImage
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,8 +87,7 @@ import me.mudkip.moememos.R
 import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ui.security.AppLockGate
 import me.mudkip.moememos.ui.theme.MoeMemosTheme
-import me.mudkip.moememos.viewmodel.UserStateViewModel
-import okhttp3.OkHttpClient
+import me.mudkip.moememos.ui.util.preferHighestRefreshRate
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -101,8 +99,6 @@ import kotlin.math.min
 @AndroidEntryPoint
 class MediaViewerActivity : FragmentActivity() {
 
-    private val userStateViewModel: UserStateViewModel by viewModels()
-
     companion object {
         const val EXTRA_IMAGE_URLS = "image_urls"
         const val EXTRA_INITIAL_INDEX = "initial_index"
@@ -112,6 +108,7 @@ class MediaViewerActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         overridePendingTransitionCompat(0, 0)
         super.onCreate(savedInstanceState)
+        preferHighestRefreshRate()
         hideStatusBar()
 
         val imageUrls = intent.getStringArrayExtra(EXTRA_IMAGE_URLS)?.toList().orEmpty()
@@ -129,7 +126,6 @@ class MediaViewerActivity : FragmentActivity() {
                         imageUrls = imageUrls,
                         initialIndex = initialIndex,
                         caption = caption,
-                        okHttpClient = userStateViewModel.okHttpClient,
                         onClose = { finishWithoutAnimation() }
                     )
                 }
@@ -183,21 +179,11 @@ private fun MediaViewerScreen(
     imageUrls: List<String>,
     initialIndex: Int,
     caption: String,
-    okHttpClient: OkHttpClient,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
-    val imageLoader = remember(context, okHttpClient) {
-        ImageLoader.Builder(context)
-            .components {
-                add(
-                    OkHttpNetworkFetcherFactory(
-                        callFactory = { okHttpClient }
-                    )
-                )
-            }
-            .build()
-    }
+    val imageLoader = remember(context) { SingletonImageLoader.get(context) }
+
     val pagerState = rememberPagerState(
         initialPage = initialIndex,
         pageCount = { imageUrls.size }
@@ -498,7 +484,7 @@ private fun MediaViewerPage(
                 val diskCache = imageLoader.diskCache
                 val diskCacheKey = state.result.diskCacheKey
                 val cachedFile = if (diskCache != null && diskCacheKey != null) {
-                    diskCache.openSnapshot(diskCacheKey)?.data?.toFile()
+                    diskCache.openSnapshot(diskCacheKey)?.use { it.data.toFile() }
                 } else {
                     null
                 }

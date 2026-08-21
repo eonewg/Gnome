@@ -55,6 +55,25 @@
             android:theme="@style/Theme.MoeMemos.MediaViewer" />
 
         <activity
+            android:name=".QuickMemoActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:taskAffinity="me.mudkip.moememos.quickcapture"
+            android:theme="@style/Theme.MoeMemos" />
+
+        <service
+            android:name=".QuickMemoTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_add"
+            android:label="@string/quick_note"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <activity
             android:name=".widget.MeoMemosGlanceWidgetConfigurationActivity"
             android:exported="true"
             android:theme="@style/Theme.MoeMemos">

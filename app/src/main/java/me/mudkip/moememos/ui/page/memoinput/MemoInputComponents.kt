@@ -2,26 +2,33 @@ package me.mudkip.moememos.ui.page.memoinput
 
 import android.content.ClipData
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Attachment
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckBox
@@ -34,15 +41,20 @@ import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.BottomAppBarDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -53,12 +65,26 @@ import androidx.compose.ui.draganddrop.mimeTypes
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import me.mudkip.moememos.R
 import me.mudkip.moememos.data.local.entity.ResourceEntity
@@ -69,6 +95,8 @@ import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ext.titleResource
 import me.mudkip.moememos.ui.component.Attachment
 import me.mudkip.moememos.ui.component.InputImage
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
+import me.mudkip.moememos.util.findCustomTagMatches
 import me.mudkip.moememos.viewmodel.MemoInputViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,25 +107,36 @@ internal fun MemoInputTopBar(
     onClose: () -> Unit,
     onSubmit: () -> Unit
 ) {
+    val colors = MoeMemosDesign.colors
     TopAppBar(
-        title = {
-            if (isEditMode) {
-                Text(R.string.edit.string)
-            } else {
-                Text(R.string.compose.string)
-            }
-        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = colors.cardBackground,
+            scrolledContainerColor = colors.cardBackground,
+        ),
+        title = {},
         navigationIcon = {
-            IconButton(onClick = onClose) {
-                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.close))
+            TextButton(
+                onClick = onClose,
+                contentPadding = PaddingValues(horizontal = 16.dp),
+            ) {
+                Text(
+                    text = R.string.cancel.string,
+                    color = colors.textPrimary,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
         },
         actions = {
-            IconButton(
+            TextButton(
                 enabled = canSubmit,
-                onClick = onSubmit
+                onClick = onSubmit,
+                contentPadding = PaddingValues(horizontal = 16.dp),
             ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.post))
+                Text(
+                    text = R.string.post.string,
+                    color = if (canSubmit) colors.accent else colors.textSecondary.copy(alpha = 0.45f),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
         }
     )
@@ -132,26 +171,39 @@ internal fun MemoInputBottomBar(
     visibilityMenuExpanded: Boolean,
     onVisibilityExpandedChange: (Boolean) -> Unit,
     onVisibilitySelected: (MemoVisibility) -> Unit,
-    tags: List<String>,
-    tagMenuExpanded: Boolean,
-    onTagExpandedChange: (Boolean) -> Unit,
     onHashTagClick: () -> Unit,
-    onTagSelected: (String) -> Unit,
     onToggleTodoItem: () -> Unit,
     onPickImage: () -> Unit,
     onPickAttachment: () -> Unit,
     onTakePhoto: () -> Unit,
     onFormat: (MarkdownFormat) -> Unit,
+    canSubmit: Boolean = false,
+    onSubmit: (() -> Unit)? = null,
 ) {
     val scrollState = rememberScrollState()
+    val colors = MoeMemosDesign.colors
+    val isCompactBottomSheet = onSubmit != null
 
-    BottomAppBar {
+    BottomAppBar(
+        modifier = if (isCompactBottomSheet) Modifier.height(56.dp) else Modifier,
+        containerColor = colors.cardBackground,
+        contentColor = colors.textPrimary,
+        tonalElevation = 0.dp,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        windowInsets = if (isCompactBottomSheet) {
+            WindowInsets(0, 0, 0, 0)
+        } else {
+            BottomAppBarDefaults.windowInsets
+        },
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = Modifier.horizontalScroll(scrollState),
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(scrollState),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (currentAccount !is Account.Local) {
@@ -191,34 +243,12 @@ internal fun MemoInputBottomBar(
                     }
                 }
 
-                if (tags.isEmpty()) {
-                    IconButton(onClick = onHashTagClick) {
-                        Icon(Icons.Outlined.Tag, contentDescription = stringResource(R.string.tag))
-                    }
-                } else {
-                    Box {
-                        DropdownMenu(
-                            expanded = tagMenuExpanded,
-                            onDismissRequest = { onTagExpandedChange(false) },
-                            properties = PopupProperties(focusable = false)
-                        ) {
-                            tags.forEach { tag ->
-                                DropdownMenuItem(
-                                    text = { Text(tag) },
-                                    onClick = {
-                                        onTagSelected(tag)
-                                        onTagExpandedChange(false)
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Outlined.Tag, contentDescription = null)
-                                    }
-                                )
-                            }
-                        }
-                        IconButton(onClick = { onTagExpandedChange(!tagMenuExpanded) }) {
-                            Icon(Icons.Outlined.Tag, contentDescription = stringResource(R.string.tag))
-                        }
-                    }
+                IconButton(onClick = onHashTagClick) {
+                    Text(
+                        text = "#",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.textPrimary,
+                    )
                 }
 
                 IconButton(onClick = onToggleTodoItem) {
@@ -241,6 +271,28 @@ internal fun MemoInputBottomBar(
 
                 FormattingButtons(onFormat = onFormat)
             }
+
+            if (onSubmit != null) {
+                Surface(
+                    modifier = Modifier
+                        .padding(horizontal = 8.dp)
+                        .size(width = 56.dp, height = 42.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (canSubmit) colors.accent else colors.subtleSurface,
+                    contentColor = if (canSubmit) colors.cardBackground else colors.textSecondary.copy(alpha = 0.35f),
+                ) {
+                    IconButton(
+                        enabled = canSubmit,
+                        onClick = onSubmit,
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Send,
+                            contentDescription = R.string.post.string,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -255,8 +307,27 @@ internal fun MemoInputEditor(
     validMimeTypePrefixes: Set<String>,
     onDroppedText: (String) -> Unit,
     uploadResources: List<ResourceEntity>,
-    inputViewModel: MemoInputViewModel
+    inputViewModel: MemoInputViewModel,
+    tagSuggestions: List<String>,
+    compactTagSuggestions: Boolean = false,
+    onTagSuggestionSelected: (String) -> Unit,
 ) {
+    val colors = MoeMemosDesign.colors
+    val tagVisualTransformation = remember(colors.tagForeground) {
+        VisualTransformation { source ->
+            val highlighted = buildAnnotatedString {
+                append(source)
+                findCustomTagMatches(source.text).forEach { match ->
+                    addStyle(
+                        style = SpanStyle(color = colors.tagForeground),
+                        start = match.range.first,
+                        end = match.range.last + 1,
+                    )
+                }
+            }
+            TransformedText(highlighted, OffsetMapping.Identity)
+        }
+    }
     val imageResources = remember(uploadResources) {
         uploadResources.filter { it.mimeType?.startsWith("image/") == true }
     }
@@ -293,17 +364,75 @@ internal fun MemoInputEditor(
                 }
             )
     ) {
-        OutlinedTextField(
+        BasicTextField(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp)
+                .padding(
+                    start = 20.dp,
+                    top = if (compactTagSuggestions) 0.dp else 12.dp,
+                    end = 20.dp,
+                    bottom = if (compactTagSuggestions) 4.dp else 20.dp,
+                )
                 .weight(1f)
                 .focusRequester(focusRequester),
             value = text,
-            label = { Text(R.string.any_thoughts.string) },
             onValueChange = onTextChange,
-            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.textPrimary),
+            visualTransformation = tagVisualTransformation,
+            cursorBrush = SolidColor(colors.accent),
+            decorationBox = { innerTextField ->
+                Box {
+                    if (text.text.isEmpty()) {
+                        Text(
+                            text = R.string.any_thoughts.string,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = colors.textSecondary,
+                        )
+                    }
+                    innerTextField()
+                }
+            },
         )
+
+        if (tagSuggestions.isNotEmpty() && !compactTagSuggestions) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = 8.dp,
+                    ),
+                shape = MaterialTheme.shapes.large,
+                color = colors.subtleSurface,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+            ) {
+                LazyColumn(modifier = Modifier.heightIn(max = 220.dp)) {
+                    items(tagSuggestions, key = { it }) { tag ->
+                        DropdownMenuItem(
+                            text = { Text("#$tag") },
+                            onClick = { onTagSuggestionSelected(tag) },
+                            leadingIcon = {
+                                Icon(Icons.Outlined.Tag, contentDescription = null)
+                            },
+                            colors = MenuDefaults.itemColors(
+                                textColor = colors.tagForeground,
+                                leadingIconColor = colors.tagForeground,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
+
+        if (tagSuggestions.isNotEmpty() && compactTagSuggestions) {
+            CompactTagSuggestionPopup(
+                tags = tagSuggestions,
+                onTagSelected = onTagSuggestionSelected,
+            )
+        }
 
         if (imageResources.isNotEmpty()) {
             LazyRow(
@@ -333,6 +462,72 @@ internal fun MemoInputEditor(
                         resource = resource,
                         onRemove = { inputViewModel.deleteResource(resource.identifier) }
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactTagSuggestionPopup(
+    tags: List<String>,
+    onTagSelected: (String) -> Unit,
+) {
+    val colors = MoeMemosDesign.colors
+    val density = LocalDensity.current
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val gapPx = with(density) { 8.dp.roundToPx() }
+    val positionProvider = remember(gapPx) {
+        object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset {
+                return IntOffset(
+                    x = ((windowSize.width - popupContentSize.width) / 2).coerceAtLeast(0),
+                    y = (anchorBounds.top - popupContentSize.height - gapPx).coerceAtLeast(gapPx),
+                )
+            }
+        }
+    }
+
+    Popup(
+        popupPositionProvider = positionProvider,
+        onDismissRequest = {},
+        properties = PopupProperties(
+            focusable = false,
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            clippingEnabled = true,
+        ),
+    ) {
+        Surface(
+            modifier = Modifier
+                .width(screenWidth - 44.dp)
+                .heightIn(max = 260.dp),
+            shape = RoundedCornerShape(16.dp),
+            color = colors.cardBackground,
+            contentColor = colors.textPrimary,
+            tonalElevation = 0.dp,
+            shadowElevation = 10.dp,
+        ) {
+            LazyColumn {
+                items(tags, key = { it }) { tag ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onTagSelected(tag) }
+                            .padding(horizontal = 16.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "# $tag",
+                            color = colors.textPrimary,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
                 }
             }
         }

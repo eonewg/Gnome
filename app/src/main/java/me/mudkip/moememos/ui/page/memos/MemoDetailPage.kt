@@ -1,6 +1,5 @@
 package me.mudkip.moememos.ui.page.memos
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -23,8 +23,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,6 +52,8 @@ import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ext.titleResource
 import me.mudkip.moememos.ui.component.MemoContent
 import me.mudkip.moememos.ui.component.MemosCardActionButton
+import me.mudkip.moememos.ui.component.toMemoTimestamp
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
 
@@ -65,6 +69,7 @@ fun MemoDetailPage(
     val userStateViewModel = LocalUserState.current
     val currentAccount by userStateViewModel.currentAccount.collectAsState()
     val scope = rememberCoroutineScope()
+    val colors = MoeMemosDesign.colors
     val memo = remember(memosViewModel.memos.toList(), memoIdentifier) {
         memosViewModel.memos.firstOrNull { it.identifier == memoIdentifier }
     }
@@ -78,12 +83,27 @@ fun MemoDetailPage(
     }
 
     Scaffold(
+        containerColor = colors.appBackground,
         topBar = {
             TopAppBar(
-                title = { Text(text = R.string.memo.string) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = colors.appBackground,
+                    scrolledContainerColor = colors.appBackground,
+                ),
+                title = {
+                    Text(
+                        text = R.string.memo.string,
+                        color = colors.textPrimary,
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStackIfLifecycleIsResumed(lifecycleOwner) }) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = R.string.back.string)
+                        Icon(
+                            Icons.AutoMirrored.Outlined.ArrowBack,
+                            contentDescription = R.string.back.string,
+                            tint = colors.textSecondary,
+                        )
                     }
                 },
                 actions = {
@@ -115,61 +135,71 @@ fun MemoDetailPage(
                 )
                 .verticalScroll(rememberScrollState())
         ) {
-            Row(
+            Surface(
                 modifier = Modifier
-                    .padding(start = 15.dp, top = 10.dp, end = 15.dp)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
                     .fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                shape = RoundedCornerShape(20.dp),
+                color = colors.cardBackground,
+                contentColor = colors.textPrimary,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
             ) {
-                Text(
-                    DateUtils.getRelativeTimeSpanString(
-                        memo.date.toEpochMilli(),
-                        System.currentTimeMillis(),
-                        DateUtils.SECOND_IN_MILLIS
-                    ).toString(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outline
-                )
-                if (currentAccount !is Account.Local && memo.needsSync) {
-                    Icon(
-                        imageVector = Icons.Outlined.CloudOff,
-                        contentDescription = R.string.memo_sync_pending.string,
+                Column {
+                    Row(
                         modifier = Modifier
-                            .padding(start = 5.dp)
-                            .size(20.dp),
-                    )
-                }
-                if (userStateViewModel.currentUser?.defaultVisibility != memo.visibility) {
-                    Icon(
-                        imageVector = memo.visibility.icon,
-                        contentDescription = stringResource(memo.visibility.titleResource),
-                        modifier = Modifier
-                            .padding(start = 5.dp)
-                            .size(20.dp)
+                            .padding(start = 18.dp, top = 16.dp, end = 18.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            memo.date.toMemoTimestamp(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.textSecondary,
+                        )
+                        if (currentAccount !is Account.Local && memo.needsSync) {
+                            Icon(
+                                imageVector = Icons.Outlined.CloudOff,
+                                contentDescription = R.string.memo_sync_pending.string,
+                                modifier = Modifier
+                                    .padding(start = 5.dp)
+                                    .size(18.dp),
+                            )
+                        }
+                        if (userStateViewModel.currentUser?.defaultVisibility != memo.visibility) {
+                            Icon(
+                                imageVector = memo.visibility.icon,
+                                contentDescription = stringResource(memo.visibility.titleResource),
+                                modifier = Modifier
+                                    .padding(start = 5.dp)
+                                    .size(18.dp),
+                                tint = colors.textSecondary,
+                            )
+                        }
+                    }
+
+                    MemoContent(
+                        memo = memo,
+                        selectable = true,
+                        checkboxChange = { checked, startOffset, endOffset ->
+                            scope.launch {
+                                var text = memo.content.substring(startOffset, endOffset)
+                                text = if (checked) {
+                                    text.replace("[ ]", "[x]")
+                                } else {
+                                    text.replace("[x]", "[ ]")
+                                }
+                                memosViewModel.editMemo(
+                                    memo.identifier,
+                                    memo.content.replaceRange(startOffset, endOffset, text),
+                                    memo.resources,
+                                    memo.visibility
+                                )
+                            }
+                        }
                     )
                 }
             }
-
-            MemoContent(
-                memo = memo,
-                selectable = true,
-                checkboxChange = { checked, startOffset, endOffset ->
-                    scope.launch {
-                        var text = memo.content.substring(startOffset, endOffset)
-                        text = if (checked) {
-                            text.replace("[ ]", "[x]")
-                        } else {
-                            text.replace("[x]", "[ ]")
-                        }
-                        memosViewModel.editMemo(
-                            memo.identifier,
-                            memo.content.replaceRange(startOffset, endOffset, text),
-                            memo.resources,
-                            memo.visibility
-                        )
-                    }
-                }
-            )
 
             Spacer(modifier = Modifier.height(innerPadding.calculateBottomPadding()))
         }

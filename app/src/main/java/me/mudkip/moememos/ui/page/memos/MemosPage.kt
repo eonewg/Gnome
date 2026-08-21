@@ -9,18 +9,32 @@ import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.ui.component.SideDrawer
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 
 @Composable
-fun MemosPage() {
+fun MemosPage(quickMemoRequestId: Long = 0L) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val memosNavController = rememberNavController()
+    val colors = MoeMemosDesign.colors
+    var memoInputActive by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(memoInputActive) {
+        if (memoInputActive && drawerState.isOpen) {
+            drawerState.close()
+        }
+    }
 
     BackHandler(enabled = drawerState.isOpen) {
         scope.launch {
@@ -31,7 +45,9 @@ fun MemosPage() {
     if (windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)) {
         PermanentNavigationDrawer(
             drawerContent = {
-                PermanentDrawerSheet {
+                PermanentDrawerSheet(
+                    drawerContainerColor = colors.cardBackground,
+                ) {
                     SideDrawer(
                         memosNavController = memosNavController,
                     )
@@ -39,24 +55,32 @@ fun MemosPage() {
             }
         ) {
             MemosNavigation(
-                navController = memosNavController
+                navController = memosNavController,
+                quickMemoRequestId = quickMemoRequestId,
+                onMemoInputActiveChange = { memoInputActive = it },
             )
         }
     } else {
         ModalNavigationDrawer(
             drawerState = drawerState,
+            gesturesEnabled = !memoInputActive,
             drawerContent = {
-                ModalDrawerSheet {
+                ModalDrawerSheet(
+                    drawerContainerColor = colors.cardBackground,
+                ) {
                     SideDrawer(
                         memosNavController = memosNavController,
-                        drawerState = drawerState
+                        drawerState = drawerState,
+                        loadTags = drawerState.currentValue == DrawerValue.Open,
                     )
                 }
             }
         ) {
             MemosNavigation(
                 drawerState = drawerState,
-                navController = memosNavController
+                navController = memosNavController,
+                quickMemoRequestId = quickMemoRequestId,
+                onMemoInputActiveChange = { memoInputActive = it },
             )
         }
     }

@@ -2,6 +2,9 @@ package me.mudkip.moememos.ui.page.memos
 
 import android.net.Uri
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,6 +20,7 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,10 +29,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.R
+import me.mudkip.moememos.data.local.entity.MemoEntity
 import me.mudkip.moememos.data.model.Account
 import me.mudkip.moememos.data.model.MemoEditGesture
 import me.mudkip.moememos.data.model.Settings
@@ -43,6 +49,28 @@ import me.mudkip.moememos.viewmodel.LocalUserState
 import me.mudkip.moememos.viewmodel.ManualSyncResult
 import timber.log.Timber
 
+enum class MemoSortOrder {
+    CreatedNewest,
+    CreatedOldest,
+    UpdatedNewest,
+    UpdatedOldest,
+}
+
+internal fun orderMemosForTimeline(
+    memos: List<MemoEntity>,
+    sortOrder: MemoSortOrder,
+): List<MemoEntity> {
+    val comparator = when (sortOrder) {
+        MemoSortOrder.CreatedNewest -> compareByDescending<MemoEntity> { it.date }
+        MemoSortOrder.CreatedOldest -> compareBy<MemoEntity> { it.date }
+        MemoSortOrder.UpdatedNewest -> compareByDescending<MemoEntity> { it.lastModified }
+        MemoSortOrder.UpdatedOldest -> compareBy<MemoEntity> { it.lastModified }
+    }
+    val pinned = memos.filter { it.pinned }.sortedWith(comparator)
+    val nonPinned = memos.filter { !it.pinned }.sortedWith(comparator)
+    return pinned + nonPinned
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemosList(
@@ -53,8 +81,13 @@ fun MemosList(
     additionalBottomPadding: Dp = 16.dp,
     onRefresh: (suspend () -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
+    sortOrder: MemoSortOrder = MemoSortOrder.CreatedNewest,
+    selectionMode: Boolean = false,
+    selectedMemoIds: Set<String> = emptySet(),
+    onSelectionToggle: ((MemoEntity) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val layoutDirection = LocalLayoutDirection.current
     val navController = LocalRootNavController.current
     val viewModel = LocalMemos.current
     val userStateViewModel = LocalUserState.current
@@ -68,34 +101,40 @@ fun MemosList(
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     var syncAlert by remember { mutableStateOf<PullRefreshSyncAlert?>(null) }
-    val filteredMemos = remember(viewModel.memos.toList(), tag, searchString) {
-        val pinned = viewModel.memos.filter { it.pinned }
-        val nonPinned = viewModel.memos.filter { !it.pinned }
-        var fullList = pinned + nonPinned
+    val filteredMemos by remember(tag, searchString, sortOrder) {
+        derivedStateOf {
+            var fullList = orderMemosForTimeline(viewModel.memos, sortOrder)
 
-        tag?.let { tag ->
-            fullList = fullList.filter { memo ->
-                memo.content.contains("#$tag") ||
-                        memo.content.contains("#$tag/")
-            }
-        }
-
-        searchString?.let { searchString ->
-            if (searchString.isNotEmpty()) {
+            tag?.let { tag ->
                 fullList = fullList.filter { memo ->
-                    memo.content.contains(searchString, true)
+                    memo.content.contains("#$tag") ||
+                        memo.content.contains("#$tag/")
                 }
             }
-        }
 
-        fullList
+            searchString?.let { searchString ->
+                if (searchString.isNotEmpty()) {
+                    fullList = fullList.filter { memo ->
+                        memo.content.contains(searchString, true)
+                    }
+                }
+            }
+
+            fullList
+        }
     }
     var listTopId: String? by rememberSaveable {
         mutableStateOf(null)
     }
-    val listContentPadding = edgeToEdgeContentPadding(
+    val edgeToEdgePadding = edgeToEdgeContentPadding(
         contentPadding,
         additionalBottomPadding
+    )
+    val listContentPadding = PaddingValues(
+        start = edgeToEdgePadding.calculateStartPadding(layoutDirection) + 14.dp,
+        top = edgeToEdgePadding.calculateTopPadding() + 8.dp,
+        end = edgeToEdgePadding.calculateEndPadding(layoutDirection) + 14.dp,
+        bottom = edgeToEdgePadding.calculateBottomPadding() + 12.dp,
     )
 
     PullToRefreshBox(
@@ -130,9 +169,14 @@ fun MemosList(
                 .fillMaxSize()
                 .consumeWindowInsets(contentPadding),
             state = lazyListState,
-            contentPadding = listContentPadding
+            contentPadding = listContentPadding,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(filteredMemos, key = { it.identifier }) { memo ->
+            items(
+                items = filteredMemos,
+                key = { it.identifier },
+                contentType = { "memo" }
+            ) { memo ->
                 MemosCard(
                     memo = memo,
                     onClick = { selectedMemo ->
@@ -140,10 +184,13 @@ fun MemosList(
                             "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.identifier)}"
                         )
                     },
-                    editGesture = editGesture ?: MemoEditGesture.NONE,
+                    editGesture = if (selectionMode) MemoEditGesture.NONE else editGesture ?: MemoEditGesture.NONE,
                     previewMode = true,
                     showSyncStatus = currentAccount !is Account.Local,
-                    onTagClick = onTagClick
+                    onTagClick = if (selectionMode) null else onTagClick,
+                    selectionMode = selectionMode,
+                    selected = memo.identifier in selectedMemoIds,
+                    onSelectionToggle = onSelectionToggle,
                 )
             }
         }

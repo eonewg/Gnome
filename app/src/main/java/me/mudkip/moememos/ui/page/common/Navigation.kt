@@ -46,6 +46,7 @@ fun Navigation() {
     val userStateViewModel = LocalUserState.current
     val context = LocalContext.current
     var shareContent by remember { mutableStateOf<ShareContent?>(null) }
+    var quickMemoRequestId by remember { mutableStateOf(0L) }
 
     CompositionLocalProvider(LocalRootNavController provides navController) {
         MoeMemosTheme {
@@ -63,7 +64,7 @@ fun Navigation() {
                 },
             ) {
                 composable(RouteName.MEMOS) {
-                    MemosPage()
+                    MemosPage(quickMemoRequestId = quickMemoRequestId)
                 }
 
                 composable(RouteName.SETTINGS) {
@@ -151,6 +152,17 @@ fun Navigation() {
             }
             MainActivity.ACTION_NEW_MEMO -> {
                 navController.navigate(RouteName.INPUT)
+            }
+            MainActivity.ACTION_QUICK_MEMO -> {
+                quickMemoRequestId += 1
+                navController.navigate(RouteName.MEMOS) {
+                    popUpTo(RouteName.MEMOS) {
+                        inclusive = false
+                    }
+                    launchSingleTop = true
+                }
+                // Prevent an Activity recreation from reopening an already consumed request.
+                intent.action = null
             }
             MainActivity.ACTION_EDIT_MEMO -> {
                 val memoId = intent.getStringExtra(MainActivity.EXTRA_MEMO_ID)

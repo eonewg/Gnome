@@ -6,6 +6,7 @@
     <string name="menu">Menü</string>
     <string name="search_hint">Suchen…</string>
     <string name="new_memo">Neue Notiz</string>
+    <string name="quick_note">Schnellnotiz</string>
     <string name="compose">Verfassen</string>
     <string name="remove">Entfernen</string>
     <string name="resources">Ressourcen</string>

@@ -41,6 +41,7 @@ import com.mikepenz.markdown.utils.getUnescapedTextInNode
 import me.mudkip.moememos.util.findCustomTagMatches
 import me.mudkip.moememos.util.getCustomTagName
 import me.mudkip.moememos.util.isCustomTagSupportedNode
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import org.intellij.markdown.MarkdownTokenTypes
 import com.mikepenz.markdown.m3.Markdown as M3Markdown
 
@@ -58,7 +59,10 @@ fun Markdown(
         return if (textAlign == null) style else style.copy(textAlign = textAlign)
     }
 
-    val bodyTextStyle = withOptionalTextAlign(MaterialTheme.typography.bodyLarge)
+    val colors = MoeMemosDesign.colors
+    val bodyTextStyle = withOptionalTextAlign(
+        MaterialTheme.typography.bodyLarge.copy(color = colors.textPrimary)
+    )
     val h1TextStyle = withOptionalTextAlign(MaterialTheme.typography.headlineLarge)
     val h2TextStyle = withOptionalTextAlign(MaterialTheme.typography.headlineMedium)
     val h3TextStyle = withOptionalTextAlign(MaterialTheme.typography.headlineSmall)
@@ -68,8 +72,9 @@ fun Markdown(
     val uriHandler = LocalUriHandler.current
     val tagLinkStyle = TextLinkStyles(
         style = SpanStyle(
-            color = MaterialTheme.colorScheme.primary,
-            textDecoration = TextDecoration.Underline,
+            color = colors.tagForeground,
+            background = colors.tagBackground,
+            textDecoration = TextDecoration.None,
         )
     )
     val tagLinkListener = remember(uriHandler, onTagClick) {
@@ -148,7 +153,9 @@ fun Markdown(
                                 linkInteractionListener = tagLinkListener
                             )
                         ) {
+                            append("\u2009")
                             append(match.value)
+                            append("\u2009")
                         }
                         cursor = endInclusive + 1
                     }

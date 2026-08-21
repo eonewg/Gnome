@@ -8,6 +8,7 @@
     <string name="menu">Меню</string>
     <string name="search_hint">Что найти?</string>
     <string name="new_memo">Новая Заметка</string>
+    <string name="quick_note">Быстрая заметка</string>
     <string name="compose">Составить заметку</string>
     <string name="remove">Удалить</string>
     <string name="resources">Ресурсы</string>

@@ -6,6 +6,7 @@
     <string name="menu">メニュー</string>
     <string name="search_hint">検索…</string>
     <string name="new_memo">新しいメモ</string>
+    <string name="quick_note">クイックメモ</string>
     <string name="compose">作成</string>
     <string name="remove">削除</string>
     <string name="resources">リソース</string>

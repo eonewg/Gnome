@@ -34,13 +34,20 @@ interface MemosV1Api {
     suspend fun createMemo(@Body body: MemosV1CreateMemoRequest): ApiResponse<MemosV1Memo>
 
     @PATCH("api/v1/memos/{id}")
-    suspend fun updateMemo(@Path("id") memoId: String, @Body body: UpdateMemoRequest): ApiResponse<MemosV1Memo>
+    suspend fun updateMemo(
+        @Path("id") memoId: String,
+        @Query("updateMask") updateMask: String,
+        @Body body: UpdateMemoRequest,
+    ): ApiResponse<MemosV1Memo>
 
     @DELETE("api/v1/memos/{id}")
     suspend fun deleteMemo(@Path("id") memoId: String): ApiResponse<Unit>
 
     @GET("api/v1/attachments")
-    suspend fun listResources(): ApiResponse<ListResourceResponse>
+    suspend fun listResources(
+        @Query("pageSize") pageSize: Int,
+        @Query("pageToken") pageToken: String? = null,
+    ): ApiResponse<ListResourceResponse>
 
     @POST("api/v1/attachments")
     suspend fun createResource(@Body body: RequestBody): ApiResponse<MemosV1Resource>
@@ -107,7 +114,8 @@ data class UpdateMemoRequest(
 
 @Serializable
 data class ListResourceResponse(
-    val attachments: List<MemosV1Resource>
+    val attachments: List<MemosV1Resource>,
+    val nextPageToken: String? = null,
 )
 
 @Serializable

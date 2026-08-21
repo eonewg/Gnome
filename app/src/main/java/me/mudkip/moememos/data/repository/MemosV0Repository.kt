@@ -135,6 +135,10 @@ class MemosV0Repository (
         return memosApi.deleteMemo(remoteId.toLong())
     }
 
+    override suspend fun listTags(): ApiResponse<List<String>> {
+        return memosApi.getTags(account.info.remoteIdentifier.toLong())
+    }
+
     override suspend fun listResources(): ApiResponse<List<Resource>> {
         return memosApi.getResources().mapSuccess {
             this.map { convertResource(it) }

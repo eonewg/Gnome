@@ -7,6 +7,7 @@
     <string name="menu">Menü</string>
     <string name="search_hint">Ara…</string>
     <string name="new_memo">Yeni Not</string>
+    <string name="quick_note">Hızlı Not</string>
     <string name="compose">Oluştur</string>
     <string name="remove">Kaldır</string>
     <string name="resources">Kaynaklar</string>

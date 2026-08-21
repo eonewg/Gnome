@@ -3,8 +3,9 @@ package me.mudkip.moememos.ui.component
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
-import android.text.format.DateUtils
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +14,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CloudOff
@@ -26,7 +30,6 @@ import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -35,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -58,8 +63,11 @@ import me.mudkip.moememos.ext.string
 import me.mudkip.moememos.ext.titleResource
 import me.mudkip.moememos.ui.page.common.LocalRootNavController
 import me.mudkip.moememos.ui.page.common.RouteName
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun MemosCard(
@@ -68,18 +76,24 @@ fun MemosCard(
     editGesture: MemoEditGesture = MemoEditGesture.NONE,
     previewMode: Boolean = false,
     showSyncStatus: Boolean = false,
-    onTagClick: ((String) -> Unit)? = null
+    onTagClick: ((String) -> Unit)? = null,
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    onSelectionToggle: ((MemoEntity) -> Unit)? = null,
 ) {
     val memosViewModel = LocalMemos.current
     val rootNavController = LocalRootNavController.current
     val scope = rememberCoroutineScope()
+    val colors = MoeMemosDesign.colors
+    var previewExpanded by rememberSaveable(memo.identifier) { mutableStateOf(false) }
 
     val cardModifier = Modifier
-        .padding(horizontal = 15.dp, vertical = 10.dp)
         .fillMaxWidth()
         .combinedClickable(
             onClick = {
-                if (editGesture == MemoEditGesture.SINGLE) {
+                if (selectionMode) {
+                    onSelectionToggle?.invoke(memo)
+                } else if (editGesture == MemoEditGesture.SINGLE) {
                     rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
                 } else {
                     onClick(memo)
@@ -101,29 +115,34 @@ fun MemosCard(
             }
         )
 
-    Card(
+    Surface(
         modifier = cardModifier,
-        border = if (memo.pinned) {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
-        }
+        shape = RoundedCornerShape(20.dp),
+        color = colors.cardBackground,
+        contentColor = colors.textPrimary,
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp,
+        border = when {
+            selectionMode && selected -> BorderStroke(1.dp, colors.accent)
+            memo.pinned -> BorderStroke(1.dp, colors.accent.copy(alpha = 0.35f))
+            else -> null
+        },
     ) {
         Column {
             Row(
                 modifier = Modifier
-                    .padding(start = 15.dp)
+                    .padding(start = 18.dp, top = 6.dp, end = 6.dp)
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (selectionMode) {
+                    MemoSelectionIndicator(selected = selected)
+                    Spacer(modifier = Modifier.size(8.dp))
+                }
                 Text(
-                    DateUtils.getRelativeTimeSpanString(
-                        memo.date.toEpochMilli(),
-                        System.currentTimeMillis(),
-                        DateUtils.SECOND_IN_MILLIS
-                    ).toString(),
+                    memo.date.toMemoTimestamp(),
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.outline
+                    color = colors.textSecondary,
                 )
                 if (showSyncStatus && memo.needsSync) {
                     Icon(
@@ -131,7 +150,7 @@ fun MemosCard(
                         contentDescription = R.string.memo_sync_pending.string,
                         modifier = Modifier
                             .padding(start = 5.dp)
-                            .size(20.dp),
+                            .size(18.dp),
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
@@ -141,18 +160,24 @@ fun MemosCard(
                         contentDescription = stringResource(memo.visibility.titleResource),
                         modifier = Modifier
                             .padding(start = 5.dp)
-                            .size(20.dp),
-                        tint = MaterialTheme.colorScheme.outline
+                            .size(18.dp),
+                        tint = colors.textSecondary,
                     )
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                MemosCardActionButton(memo)
+                if (!selectionMode) {
+                    MemosCardActionButton(memo)
+                }
             }
 
             MemoContent(
                 memo,
                 previewMode = previewMode,
                 checkboxChange = { checked, startOffset, endOffset ->
+                    if (selectionMode) {
+                        onSelectionToggle?.invoke(memo)
+                        return@MemoContent
+                    }
                     scope.launch {
                         var text = memo.content.substring(startOffset, endOffset)
                         text = if (checked) {
@@ -168,10 +193,43 @@ fun MemosCard(
                         )
                     }
                 },
-                onViewMore = {
-                    onClick(memo)
+                isPreviewExpanded = previewExpanded,
+                onPreviewExpandedChange = {
+                    if (selectionMode) {
+                        onSelectionToggle?.invoke(memo)
+                    } else {
+                        previewExpanded = it
+                    }
                 },
-                onTagClick = onTagClick
+                onTagClick = if (selectionMode) null else onTagClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoSelectionIndicator(
+    selected: Boolean,
+) {
+    val colors = MoeMemosDesign.colors
+    Box(
+        modifier = Modifier
+            .size(20.dp)
+            .then(
+                if (selected) {
+                    Modifier.background(colors.accent, CircleShape)
+                } else {
+                    Modifier.border(1.5.dp, colors.divider, CircleShape)
+                }
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = Icons.Filled.Check,
+                contentDescription = null,
+                modifier = Modifier.size(14.dp),
+                tint = colors.cardBackground,
             )
         }
     }
@@ -191,10 +249,16 @@ fun MemosCardActionButton(
     val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     val memoLabel = stringResource(R.string.memo)
+    val colors = MoeMemosDesign.colors
 
     Box {
         IconButton(onClick = { menuExpanded = true }) {
-            Icon(Icons.Filled.MoreVert, contentDescription = null)
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = colors.textSecondary,
+            )
         }
         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
             if (memo.pinned) {
@@ -364,4 +428,10 @@ fun MemosCardActionButton(
             }
         )
     }
+}
+
+private val MemoTimestampFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+internal fun java.time.Instant.toMemoTimestamp(): String {
+    return MemoTimestampFormatter.format(atZone(ZoneId.systemDefault()))
 }

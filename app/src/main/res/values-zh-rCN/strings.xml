@@ -7,6 +7,7 @@
     <string name="menu">菜单</string>
     <string name="search_hint">搜点什么…</string>
     <string name="new_memo">新 MEMO</string>
+    <string name="quick_note">速记</string>
     <string name="compose">撰写</string>
     <string name="remove">删除</string>
     <string name="resources">资源</string>
@@ -40,8 +41,8 @@
     <string name="add_task">添加任务</string>
     <string name="add_image">添加图片</string>
     <string name="take_photo">拍照</string>
-    <string name="post">记下</string>
-    <string name="any_thoughts">任何想法…</string>
+    <string name="post">发送</string>
+    <string name="any_thoughts">记录此刻的想法…</string>
     <string name="input_login_information">请输入您的 [✍️memos](https://github.com/usememos/memos) 服务器的登录信息。</string>
     <string name="day">天</string>
     <string name="username">用户名</string>
@@ -121,4 +122,25 @@
     <string name="app_lock_unavailable_short">此设备上的系统验证不可用。</string>
     <string name="unlock">解锁</string>
     <string name="open_system_security_settings">打开系统安全设置</string>
+    <string name="done">完成</string>
+    <string name="more_options">更多选项</string>
+    <string name="select_memos">选择笔记</string>
+    <string name="sort_order">排序方式</string>
+    <string name="sort_created_newest">创建时间，从新到旧</string>
+    <string name="sort_created_oldest">创建时间，从旧到新</string>
+    <string name="sort_updated_newest">编辑时间，从新到旧</string>
+    <string name="sort_updated_oldest">编辑时间，从旧到新</string>
+    <string name="selected_memos_count">已选中 %1$d 条笔记</string>
+    <string name="add_tag">添加标签</string>
+    <string name="copy_all">复制全部</string>
+    <string name="memos_copied">已复制 %1$d 条笔记</string>
+    <string name="tag_added_to_memos">已为 %1$d 条笔记添加标签</string>
+    <string name="batch_operation_failed">有 %1$d 项操作失败</string>
+    <string name="memos_deleted">已删除 %1$d 条笔记</string>
+    <string name="delete_selected_memos">删除选中的 %1$d 条笔记？</string>
+    <string name="delete_selected_memos_message">删除后无法恢复。</string>
+    <string name="tag_name">标签名称</string>
+    <string name="tag_name_hint">不用输入 #</string>
+    <string name="invalid_tag_name">标签不能为空，也不能包含空格或 #。</string>
+    <string name="existing_tags">已有标签</string>
 </resources>

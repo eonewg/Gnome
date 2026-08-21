@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import me.mudkip.moememos.data.constant.MoeMemosException
 import me.mudkip.moememos.data.local.FileStorage
 import me.mudkip.moememos.data.local.dao.MemoDao
@@ -240,12 +241,19 @@ class SyncingRepository(
 
     override suspend fun listTags(): ApiResponse<List<String>> {
         return try {
-            val tags = memoDao.getAllMemos(accountKey)
+            val localTags = memoDao.getAllMemos(accountKey)
                 .asSequence()
                 .flatMap { extractCustomTags(it.content).asSequence() }
                 .filter { it.isNotBlank() }
                 .toSet()
-                .sorted()
+            // Refresh from the current Memos instance once per editor entry.
+            // Network failures intentionally fall back to the offline snapshot.
+            val remoteTags = try {
+                remoteRepository.listTags().getOrNull().orEmpty()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            val tags = mergeTags(localTags, remoteTags)
             ApiResponse.Success(tags)
         } catch (e: Exception) {
             ApiResponse.Failure.Exception(e)
@@ -388,25 +396,27 @@ class SyncingRepository(
     }
 
     override suspend fun sync(): ApiResponse<Unit> {
-        return operationMutex.withLock {
-            setSyncing(true)
-            pendingDetailedSyncError = null
-            try {
-                val result = syncInternal()
-                if (result is ApiResponse.Success) {
-                    setSyncError(null)
-                } else {
-                    setSyncError(result.getErrorMessage())
+        return withContext(Dispatchers.IO) {
+            operationMutex.withLock {
+                setSyncing(true)
+                pendingDetailedSyncError = null
+                try {
+                    val result = syncInternal()
+                    if (result is ApiResponse.Success) {
+                        setSyncError(null)
+                    } else {
+                        setSyncError(result.getErrorMessage())
+                    }
+                    refreshUnsyncedCount()
+                    result
+                } catch (e: Throwable) {
+                    val failure = ApiResponse.Failure.Exception(e)
+                    setSyncError(failure.getErrorMessage())
+                    refreshUnsyncedCount()
+                    failure
+                } finally {
+                    setSyncing(false)
                 }
-                refreshUnsyncedCount()
-                result
-            } catch (e: Throwable) {
-                val failure = ApiResponse.Failure.Exception(e)
-                setSyncError(failure.getErrorMessage())
-                refreshUnsyncedCount()
-                failure
-            } finally {
-                setSyncing(false)
             }
         }
     }
@@ -952,6 +962,15 @@ class SyncingRepository(
             "Failed to upload one or more attachments during sync"
     }
 
+}
+
+internal fun mergeTags(localTags: Collection<String>, remoteTags: Collection<String>): List<String> {
+    return (localTags + remoteTags)
+        .asSequence()
+        .filter { it.isNotBlank() }
+        .distinct()
+        .sorted()
+        .toList()
 }
 
 private fun MemoWithResources.toMemoEntity(): MemoEntity {

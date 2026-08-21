@@ -6,7 +6,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.OpenDocument
 import androidx.activity.result.contract.ActivityResultContracts.TakePicture
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -22,9 +26,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.skydoves.sandwich.suspendOnSuccess
@@ -37,6 +44,7 @@ import me.mudkip.moememos.data.model.ShareContent
 import me.mudkip.moememos.ext.popBackStackIfLifecycleIsResumed
 import me.mudkip.moememos.ext.suspendOnErrorMessage
 import me.mudkip.moememos.ui.page.common.LocalRootNavController
+import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import me.mudkip.moememos.ui.util.PickMultipleImagesContract
 import me.mudkip.moememos.util.extractCustomTags
 import me.mudkip.moememos.viewmodel.LocalMemos
@@ -45,13 +53,22 @@ import me.mudkip.moememos.viewmodel.MemoInputViewModel
 
 private const val MaxSelectableImages = 100
 
+enum class MemoInputPresentation {
+    FullScreen,
+    BottomSheet,
+}
+
 @Composable
 fun MemoInputPage(
     viewModel: MemoInputViewModel = hiltViewModel(),
     memoIdentifier: String? = null,
-    shareContent: ShareContent? = null
+    shareContent: ShareContent? = null,
+    onFinished: (() -> Unit)? = null,
+    presentation: MemoInputPresentation = MemoInputPresentation.FullScreen,
+    active: Boolean = true,
 ) {
     val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
     val coroutineScope = rememberCoroutineScope()
     val snackbarState = remember { SnackbarHostState() }
     val navController = LocalRootNavController.current
@@ -59,15 +76,26 @@ fun MemoInputPage(
     val memosViewModel = LocalMemos.current
     val userStateViewModel = LocalUserState.current
     val currentAccount by userStateViewModel.currentAccount.collectAsState()
+    val colors = MoeMemosDesign.colors
+    val isBottomSheet = presentation == MemoInputPresentation.BottomSheet
     val memo = remember { memosViewModel.memos.toList().find { it.identifier == memoIdentifier } }
     var initialContent by remember { mutableStateOf(memo?.content ?: "") }
     var text by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(memo?.content ?: "", TextRange(memo?.content?.length ?: 0)))
     }
     var visibilityMenuExpanded by remember { mutableStateOf(false) }
-    var tagMenuExpanded by remember { mutableStateOf(false) }
     var photoImageUri by remember { mutableStateOf<Uri?>(null) }
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var wasActive by remember { mutableStateOf(active) }
+
+    val activeHashtag = remember(text.text, text.selection) { findActiveHashtag(text) }
+    val tagSuggestions = remember(active, isBottomSheet, activeHashtag, memosViewModel.tags) {
+        if (isBottomSheet && !active) {
+            emptyList()
+        } else {
+            hashtagSuggestions(activeHashtag, memosViewModel.tags)
+        }
+    }
 
     val defaultVisibility = userStateViewModel.currentUser?.defaultVisibility ?: MemoVisibility.PRIVATE
     var currentVisibility by remember { mutableStateOf(memo?.visibility ?: defaultVisibility) }
@@ -82,7 +110,7 @@ fun MemoInputPage(
         memo?.let {
             viewModel.editMemo(memo.identifier, text.text, currentVisibility, tags.toList()).suspendOnSuccess {
                 memosViewModel.refreshLocalSnapshot()
-                navController.popBackStack()
+                onFinished?.invoke() ?: navController.popBackStack()
             }.suspendOnErrorMessage { message ->
                 snackbarState.showSnackbar(message)
             }
@@ -93,7 +121,7 @@ fun MemoInputPage(
             text = TextFieldValue("")
             viewModel.updateDraft("")
             memosViewModel.refreshLocalSnapshot()
-            navController.popBackStack()
+            onFinished?.invoke() ?: navController.popBackStack()
         }.suspendOnErrorMessage { message ->
             snackbarState.showSnackbar(message)
         }
@@ -103,7 +131,8 @@ fun MemoInputPage(
         if (text.text != initialContent || viewModel.uploadResources.size != (memo?.resources?.size ?: 0)) {
             showExitConfirmation = true
         } else {
-            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+            onFinished?.invoke()
+                ?: navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
         }
     }
 
@@ -145,19 +174,107 @@ fun MemoInputPage(
         }
     }
 
-    BackHandler {
+    BackHandler(enabled = !isBottomSheet) {
         handleExit()
     }
 
-    Scaffold(
-        modifier = Modifier.imePadding(),
-        topBar = {
-            MemoInputTopBar(
-                isEditMode = memo != null,
-                canSubmit = text.text.isNotEmpty() || viewModel.uploadResources.isNotEmpty(),
-                onClose = { handleExit() },
-                onSubmit = { submit() }
+    if (isBottomSheet) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(BottomSheetEditorHeight)
+        ) {
+            Column(modifier = Modifier.matchParentSize()) {
+                MemoInputEditor(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    text = text,
+                    onTextChange = { updated ->
+                        val handled = if (
+                            text.text != updated.text &&
+                            updated.selection.start == updated.selection.end &&
+                            updated.text.length == text.text.length + 1 &&
+                            updated.selection.start > 0 &&
+                            updated.text[updated.selection.start - 1] == '\n'
+                        ) {
+                            handleEnterInText(text)
+                        } else {
+                            null
+                        }
+                        text = handled ?: updated
+                    },
+                    focusRequester = focusRequester,
+                    validMimeTypePrefixes = validMimeTypePrefixes,
+                    onDroppedText = { droppedText ->
+                        text = text.copy(text = text.text + droppedText)
+                    },
+                    uploadResources = viewModel.uploadResources.toList(),
+                    inputViewModel = viewModel,
+                    tagSuggestions = tagSuggestions,
+                    compactTagSuggestions = true,
+                    onTagSuggestionSelected = { tag ->
+                        activeHashtag?.let { token ->
+                            text = replaceActiveHashtag(text, token, tag)
+                            focusRequester.requestFocus()
+                        }
+                    },
+                )
+                MemoInputBottomBar(
+                    currentAccount = currentAccount,
+                    currentVisibility = currentVisibility,
+                    visibilityMenuExpanded = visibilityMenuExpanded,
+                    onVisibilityExpandedChange = { visibilityMenuExpanded = it },
+                    onVisibilitySelected = { currentVisibility = it },
+                    onHashTagClick = {
+                        text = replaceSelection(text, "#")
+                        focusRequester.requestFocus()
+                        keyboardController?.show()
+                    },
+                    onToggleTodoItem = {
+                        text = toggleTodoItemInText(text)
+                    },
+                    onPickImage = {
+                        pickImages.launch(Unit)
+                    },
+                    onPickAttachment = {
+                        pickAttachment.launch(arrayOf("*/*"))
+                    },
+                    onTakePhoto = {
+                        try {
+                            val uri = MoeMemosFileProvider.getImageUri(navController.context)
+                            photoImageUri = uri
+                            takePhoto.launch(uri)
+                        } catch (e: ActivityNotFoundException) {
+                            coroutineScope.launch {
+                                snackbarState.showSnackbar(e.localizedMessage ?: "Unable to take picture.")
+                            }
+                        }
+                    },
+                    onFormat = { format ->
+                        text = applyMarkdownFormatToText(text, format)
+                    },
+                    canSubmit = text.text.isNotEmpty() || viewModel.uploadResources.isNotEmpty(),
+                    onSubmit = { submit() },
+                )
+            }
+            SnackbarHost(
+                hostState = snackbarState,
+                modifier = Modifier.align(Alignment.TopCenter),
             )
+        }
+    } else Scaffold(
+        modifier = Modifier.imePadding(),
+        containerColor = colors.cardBackground,
+        topBar = {
+            if (!isBottomSheet) {
+                MemoInputTopBar(
+                    isEditMode = memo != null,
+                    canSubmit = text.text.isNotEmpty() || viewModel.uploadResources.isNotEmpty(),
+                    onClose = { handleExit() },
+                    onSubmit = { submit() }
+                )
+            }
         },
         bottomBar = {
             MemoInputBottomBar(
@@ -166,14 +283,10 @@ fun MemoInputPage(
                 visibilityMenuExpanded = visibilityMenuExpanded,
                 onVisibilityExpandedChange = { visibilityMenuExpanded = it },
                 onVisibilitySelected = { currentVisibility = it },
-                tags = memosViewModel.tags.toList(),
-                tagMenuExpanded = tagMenuExpanded,
-                onTagExpandedChange = { tagMenuExpanded = it },
                 onHashTagClick = {
                     text = replaceSelection(text, "#")
-                },
-                onTagSelected = { tag ->
-                    text = replaceSelection(text, "#$tag ")
+                    focusRequester.requestFocus()
+                    keyboardController?.show()
                 },
                 onToggleTodoItem = {
                     text = toggleTodoItemInText(text)
@@ -197,7 +310,13 @@ fun MemoInputPage(
                 },
                 onFormat = { format ->
                     text = applyMarkdownFormatToText(text, format)
-                }
+                },
+                canSubmit = text.text.isNotEmpty() || viewModel.uploadResources.isNotEmpty(),
+                onSubmit = if (isBottomSheet) {
+                    { submit() }
+                } else {
+                    null
+                },
             )
         },
         snackbarHost = {
@@ -229,7 +348,15 @@ fun MemoInputPage(
                 text = text.copy(text = text.text + droppedText)
             },
             uploadResources = viewModel.uploadResources.toList(),
-            inputViewModel = viewModel
+            inputViewModel = viewModel,
+            tagSuggestions = tagSuggestions,
+            compactTagSuggestions = isBottomSheet,
+            onTagSuggestionSelected = { tag ->
+                activeHashtag?.let { token ->
+                    text = replaceActiveHashtag(text, token, tag)
+                    focusRequester.requestFocus()
+                }
+            },
         )
     }
 
@@ -242,7 +369,8 @@ fun MemoInputPage(
             onDiscard = {
                 showExitConfirmation = false
                 text = TextFieldValue("")
-                navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                onFinished?.invoke()
+                    ?: navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
             },
             onDismiss = {
                 showExitConfirmation = false
@@ -250,7 +378,24 @@ fun MemoInputPage(
         )
     }
 
+    LaunchedEffect(active, focusRequester, keyboardController) {
+        if (active) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        } else if (isBottomSheet && wasActive) {
+            val retainedDraft = restorableMemoInputDraft(text.text)
+            if (retainedDraft != text.text) {
+                text = TextFieldValue("")
+                viewModel.updateDraft("")
+            }
+        }
+        wasActive = active
+    }
+
     LaunchedEffect(Unit) {
+        if (!isBottomSheet) {
+            memosViewModel.loadTags()
+        }
         viewModel.uploadResources.clear()
         when {
             memo != null -> {
@@ -266,20 +411,27 @@ fun MemoInputPage(
             }
 
             else -> {
-                viewModel.draft.first()?.let {
-                    text = TextFieldValue(it, TextRange(it.length))
+                viewModel.draft.first()?.let { draft ->
+                    val retainedDraft = restorableMemoInputDraft(draft)
+                    text = TextFieldValue(
+                        retainedDraft,
+                        TextRange(retainedDraft.length),
+                    )
+                    if (retainedDraft != draft) {
+                        viewModel.updateDraft("")
+                    }
                 }
             }
         }
-        delay(300)
-        focusRequester.requestFocus()
     }
 
     DisposableEffect(Unit) {
         onDispose {
             if (memo == null && shareContent == null) {
-                viewModel.updateDraft(text.text)
+                viewModel.updateDraft(restorableMemoInputDraft(text.text))
             }
         }
     }
 }
+
+private val BottomSheetEditorHeight = 160.dp
