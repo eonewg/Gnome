@@ -118,3 +118,8 @@ migration/*.zip
 migration/*.state.json
 __pycache__/
 *.pyc
+
+# Release signing (local only, never commit)
+*.jks
+*.keystore
+keystore.properties
