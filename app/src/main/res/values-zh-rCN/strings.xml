@@ -24,7 +24,7 @@
     <string name="privacy">隐私</string>
     <string name="website">官网</string>
     <string name="web">官网</string>
-    <string name="about">关于 Moe Memos</string>
+    <string name="about">关于 Gnome</string>
     <string name="add_account">登录</string>
     <string name="attachment">附件</string>
     <string name="selected">已选择</string>
@@ -58,10 +58,10 @@
     <string name="invalid_server">无效的服务器。</string>
     <string name="access_token_invalid_relogin">你的 Access Token 无效，请创建一个永不过期的 Access Token 并重新登录。</string>
     <string name="sync_failed">同步失败</string>
-    <string name="memos_supported_versions">Moe Memos 仅支持 Memos %1$s 和 Memos %2$s 至 %3$s。</string>
+    <string name="memos_supported_versions">Gnome 仅支持 Memos %1$s 和 Memos %2$s 至 %3$s。</string>
     <string name="unsupported_memos_version_title">不受支持的 Memos 版本</string>
-    <string name="memos_login_version_higher_warning">你的 Memos 版本高于 Moe Memos 支持的版本，可能存在兼容性问题。继续之前请先查看 Moe Memos 网站确认是否支持该版本。</string>
-    <string name="memos_sync_version_higher_warning">你的 Memos 版本高于 Moe Memos 支持的版本，强制同步可能会损坏未同步的数据。继续之前请先查看 Moe Memos 网站确认是否支持该版本。</string>
+    <string name="memos_login_version_higher_warning">你的 Memos 版本高于 Gnome 支持的版本，可能存在兼容性问题。继续之前请先查看 Gnome 网站确认是否支持该版本。</string>
+    <string name="memos_sync_version_higher_warning">你的 Memos 版本高于 Gnome 支持的版本，强制同步可能会损坏未同步的数据。继续之前请先查看 Gnome 网站确认是否支持该版本。</string>
     <string name="still_login">仍然登录</string>
     <string name="still_sync">仍然同步</string>
     <string name="pin">置顶</string>
@@ -111,8 +111,8 @@
     <!-- App lock strings -->
     <string name="security">安全</string>
     <string name="app_lock">应用锁</string>
-    <string name="app_lock_summary">打开 Moe Memos 时需要指纹、人脸或设备密码验证。</string>
-    <string name="app_lock_prompt_title">解锁 Moe Memos</string>
+    <string name="app_lock_summary">打开 Gnome 时需要指纹、人脸或设备密码验证。</string>
+    <string name="app_lock_prompt_title">解锁 Gnome</string>
     <string name="app_lock_prompt_subtitle">请确认是你本人以继续。</string>
     <string name="app_lock_prompt_failed">无法启动系统验证。</string>
     <string name="app_lock_authentication_required">需要验证后才能查看你的 MEMO。</string>

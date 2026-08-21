@@ -26,7 +26,7 @@
     <string name="privacy">Privacy</string>
     <string name="website">Website</string>
     <string name="web">Web</string>
-    <string name="about">About Moe Memos</string>
+    <string name="about">About Gnome</string>
     <string name="add_account">Add Account</string>
     <string name="attachment">Attachment</string>
     <string name="moe_memos" translatable="false">Gnome</string>
@@ -64,10 +64,10 @@
     <string name="invalid_server">Invalid server.</string>
     <string name="access_token_invalid_relogin">Your access token is invalid, please create a never expire access token and login again.</string>
     <string name="sync_failed">Sync Failed</string>
-    <string name="memos_supported_versions">Moe Memos only supports Memos %1$s and Memos %2$s to %3$s.</string>
+    <string name="memos_supported_versions">Gnome only supports Memos %1$s and Memos %2$s to %3$s.</string>
     <string name="unsupported_memos_version_title">Unsupported Memos Version</string>
-    <string name="memos_login_version_higher_warning">Your Memos version is higher than the versions supported by Moe Memos. Compatibility issues may happen. Check the Moe Memos website before continuing.</string>
-    <string name="memos_sync_version_higher_warning">Your Memos version is higher than the versions supported by Moe Memos. Force sync may corrupt unsynced data. Check the Moe Memos website before continuing.</string>
+    <string name="memos_login_version_higher_warning">Your Memos version is higher than the versions supported by Gnome. Compatibility issues may happen. Check the Gnome website before continuing.</string>
+    <string name="memos_sync_version_higher_warning">Your Memos version is higher than the versions supported by Gnome. Force sync may corrupt unsynced data. Check the Gnome website before continuing.</string>
     <string name="still_login">Still login</string>
     <string name="still_sync">Still Sync</string>
     <string name="pin">Pin</string>
@@ -111,8 +111,8 @@
     <!-- App lock strings -->
     <string name="security">Security</string>
     <string name="app_lock">App lock</string>
-    <string name="app_lock_summary">Require fingerprint, face unlock, or device password when opening Moe Memos.</string>
-    <string name="app_lock_prompt_title">Unlock Moe Memos</string>
+    <string name="app_lock_summary">Require fingerprint, face unlock, or device password when opening Gnome.</string>
+    <string name="app_lock_prompt_title">Unlock Gnome</string>
     <string name="app_lock_prompt_subtitle">Confirm it is you to continue.</string>
     <string name="app_lock_prompt_failed">Could not start system authentication.</string>
     <string name="app_lock_authentication_required">Authentication is required to view your memos.</string>

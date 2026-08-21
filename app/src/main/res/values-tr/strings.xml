@@ -25,7 +25,7 @@
     <string name="privacy">Gizlilik</string>
     <string name="website">Web Sitesi</string>
     <string name="web">Web</string>
-    <string name="about">Moe Memos Hakkında</string>
+    <string name="about">Gnome Hakkında</string>
     <string name="add_account">Giriş yap</string>
     <string name="attachment">Ek</string>
     <string name="moe_memos" translatable="false">Moe Notlar</string>
@@ -63,10 +63,10 @@
     <string name="invalid_server">Geçersiz sunucu.</string>
     <string name="access_token_invalid_relogin">Access Token geçersiz, lütfen süresi dolmayan bir Access Token oluşturup tekrar giriş yapın.</string>
     <string name="sync_failed">Senkronizasyon başarısız</string>
-    <string name="memos_supported_versions">Moe Memos yalnızca Memos %1$s ve Memos %2$s-%3$s sürümlerini destekler.</string>
+    <string name="memos_supported_versions">Gnome yalnızca Memos %1$s ve Memos %2$s-%3$s sürümlerini destekler.</string>
     <string name="unsupported_memos_version_title">Desteklenmeyen Memos sürümü</string>
-    <string name="memos_login_version_higher_warning">Memos sürümünüz, Moe Memos tarafından desteklenen sürümlerden daha yüksek. Uyumluluk sorunları olabilir. Devam etmeden önce Moe Memos web sitesini kontrol edin.</string>
-    <string name="memos_sync_version_higher_warning">Memos sürümünüz, Moe Memos tarafından desteklenen sürümlerden daha yüksek. Senkronizasyonu zorlamak, senkronize edilmemiş verilerin bozulmasına neden olabilir. Devam etmeden önce Moe Memos web sitesini kontrol edin.</string>
+    <string name="memos_login_version_higher_warning">Memos sürümünüz, Gnome tarafından desteklenen sürümlerden daha yüksek. Uyumluluk sorunları olabilir. Devam etmeden önce Gnome web sitesini kontrol edin.</string>
+    <string name="memos_sync_version_higher_warning">Memos sürümünüz, Gnome tarafından desteklenen sürümlerden daha yüksek. Senkronizasyonu zorlamak, senkronize edilmemiş verilerin bozulmasına neden olabilir. Devam etmeden önce Gnome web sitesini kontrol edin.</string>
     <string name="still_login">Yine de giriş yap</string>
     <string name="still_sync">Yine de senkronize et</string>
     <string name="pin">Sabitle</string>
@@ -116,8 +116,8 @@
     <!-- App lock strings -->
     <string name="security">Güvenlik</string>
     <string name="app_lock">Uygulama kilidi</string>
-    <string name="app_lock_summary">Moe Memos açılırken parmak izi, yüz tanıma veya cihaz parolası iste.</string>
-    <string name="app_lock_prompt_title">Moe Memos kilidini aç</string>
+    <string name="app_lock_summary">Gnome açılırken parmak izi, yüz tanıma veya cihaz parolası iste.</string>
+    <string name="app_lock_prompt_title">Gnome kilidini aç</string>
     <string name="app_lock_prompt_subtitle">Devam etmek için kimliğinizi doğrulayın.</string>
     <string name="app_lock_prompt_failed">Sistem kimlik doğrulaması başlatılamadı.</string>
     <string name="app_lock_authentication_required">Memolarınızı görüntülemek için kimlik doğrulaması gerekiyor.</string>

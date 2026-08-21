@@ -25,7 +25,7 @@
     <string name="privacy">Privacidade</string>
     <string name="website">Website</string>
     <string name="web">Web</string>
-    <string name="about">Sobre o Moe Memos</string>
+    <string name="about">Sobre o Gnome</string>
     <string name="add_account">Adicionar Conta</string>
     <string name="attachment">Anexo</string>
     <string name="moe_memos" translatable="false">Gnome</string>
@@ -63,10 +63,10 @@
     <string name="invalid_server">Servidor inválido.</string>
     <string name="access_token_invalid_relogin">Seu token de acesso é inválido, por favor crie um token de acesso que nunca expire e faça login novamente.</string>
     <string name="sync_failed">Falha na Sincronização</string>
-    <string name="memos_supported_versions">O Moe Memos suporta apenas as versões %1$s e %2$s a %3$s do Memos.</string>
+    <string name="memos_supported_versions">O Gnome suporta apenas as versões %1$s e %2$s a %3$s do Memos.</string>
     <string name="unsupported_memos_version_title">Versão do Memos Não Suportada</string>
-    <string name="memos_login_version_higher_warning">Sua versão do Memos é mais recente que as versões suportadas pelo Moe Memos. Problemas de compatibilidade podem ocorrer. Verifique o website do Moe Memos antes de continuar.</string>
-    <string name="memos_sync_version_higher_warning">Sua versão do Memos é mais recente que as versões suportadas pelo Moe Memos. A sincronização forçada pode corromper dados não sincronizados. Verifique o website do Moe Memos antes de continuar.</string>
+    <string name="memos_login_version_higher_warning">Sua versão do Memos é mais recente que as versões suportadas pelo Gnome. Problemas de compatibilidade podem ocorrer. Verifique o website do Gnome antes de continuar.</string>
+    <string name="memos_sync_version_higher_warning">Sua versão do Memos é mais recente que as versões suportadas pelo Gnome. A sincronização forçada pode corromper dados não sincronizados. Verifique o website do Gnome antes de continuar.</string>
     <string name="still_login">Ainda fazer login</string>
     <string name="still_sync">Sincronizar Mesmo Assim</string>
     <string name="pin">Fixar</string>
@@ -118,8 +118,8 @@
     <!-- App lock strings -->
     <string name="security">Segurança</string>
     <string name="app_lock">Bloqueio do app</string>
-    <string name="app_lock_summary">Exigir impressão digital, reconhecimento facial ou senha do dispositivo ao abrir o Moe Memos.</string>
-    <string name="app_lock_prompt_title">Desbloquear Moe Memos</string>
+    <string name="app_lock_summary">Exigir impressão digital, reconhecimento facial ou senha do dispositivo ao abrir o Gnome.</string>
+    <string name="app_lock_prompt_title">Desbloquear Gnome</string>
     <string name="app_lock_prompt_subtitle">Confirme sua identidade para continuar.</string>
     <string name="app_lock_prompt_failed">Não foi possível iniciar a autenticação do sistema.</string>
     <string name="app_lock_authentication_required">A autenticação é necessária para ver seus memos.</string>

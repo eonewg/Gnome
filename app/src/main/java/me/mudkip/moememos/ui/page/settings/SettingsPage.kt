@@ -252,25 +252,25 @@ fun SettingsPage(
 
             item {
                 SettingItem(icon = Icons.Outlined.Web, text = R.string.website.string) {
-                    uriHandler.openUri("https://memos.moe")
+                    uriHandler.openUri("https://github.com/eonewg/Gnome")
                 }
             }
 
             item {
                 SettingItem(icon = Icons.Outlined.Lock, text = R.string.privacy_policy.string) {
-                    uriHandler.openUri("https://memos.moe/privacy")
+                    uriHandler.openUri("https://github.com/eonewg/Gnome/blob/custom-memos/PRIVACY.md")
                 }
             }
 
             item {
                 SettingItem(icon = Icons.Outlined.Source, text = R.string.acknowledgements.string) {
-                    uriHandler.openUri("https://memos.moe/android-acknowledgements")
+                    uriHandler.openUri("https://github.com/eonewg/Gnome#acknowledgments")
                 }
             }
 
             item {
                 SettingItem(icon = Icons.Outlined.BugReport, text = R.string.report_an_issue.string) {
-                    uriHandler.openUri("https://github.com/mudkipme/MoeMemosAndroid/issues")
+                    uriHandler.openUri("https://github.com/eonewg/Gnome/issues")
                 }
             }
         }
