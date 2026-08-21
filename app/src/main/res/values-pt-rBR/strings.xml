@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MoeMemos</string>
+    <string name="app_name">Gnome</string>
     <string name="default_card_content" translatable="false">É o que você faz com o dom da vida que determina quem você é.      — Mewtwo</string>
     <string name="search">Pesquisar</string>
     <string name="back">Voltar</string>
@@ -28,7 +28,7 @@
     <string name="about">Sobre o Moe Memos</string>
     <string name="add_account">Adicionar Conta</string>
     <string name="attachment">Anexo</string>
-    <string name="moe_memos" translatable="false">Moe Memos</string>
+    <string name="moe_memos" translatable="false">Gnome</string>
     <string name="selected">Selecionado</string>
     <string name="username_and_password">Usuário e senha</string>
     <string name="report_an_issue">Reportar um Problema</string>

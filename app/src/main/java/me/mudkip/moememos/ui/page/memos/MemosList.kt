@@ -48,6 +48,9 @@ import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
 import me.mudkip.moememos.viewmodel.ManualSyncResult
 import timber.log.Timber
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 enum class MemoSortOrder {
     CreatedNewest,
@@ -78,6 +81,7 @@ fun MemosList(
     lazyListState: LazyListState = rememberLazyListState(),
     tag: String? = null,
     searchString: String? = null,
+    date: LocalDate? = null,
     additionalBottomPadding: Dp = 16.dp,
     onRefresh: (suspend () -> Unit)? = null,
     onTagClick: ((String) -> Unit)? = null,
@@ -101,7 +105,8 @@ fun MemosList(
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
     var syncAlert by remember { mutableStateOf<PullRefreshSyncAlert?>(null) }
-    val filteredMemos by remember(tag, searchString, sortOrder) {
+    val localOffset = remember { OffsetDateTime.now().offset }
+    val filteredMemos by remember(tag, searchString, date, sortOrder, localOffset) {
         derivedStateOf {
             var fullList = orderMemosForTimeline(viewModel.memos, sortOrder)
 
@@ -117,6 +122,12 @@ fun MemosList(
                     fullList = fullList.filter { memo ->
                         memo.content.contains(searchString, true)
                     }
+                }
+            }
+
+            date?.let { selectedDate ->
+                fullList = fullList.filter { memo ->
+                    memoMatchesDate(memo, selectedDate, localOffset)
                 }
             }
 
@@ -277,6 +288,12 @@ fun MemosList(
         }
     }
 }
+
+internal fun memoMatchesDate(
+    memo: MemoEntity,
+    date: LocalDate,
+    offset: ZoneOffset,
+): Boolean = memo.date.atOffset(offset).toLocalDate() == date
 
 private sealed class PullRefreshSyncAlert {
     data class Blocked(val message: String) : PullRefreshSyncAlert()

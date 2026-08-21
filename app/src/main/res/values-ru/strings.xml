@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MoeMemos</string>
+    <string name="app_name">Gnome</string>
     <string name="default_card_content" translatable="false">Именно то, что вы делаете с даром жизни, определяет, кто вы есть. — Мьютво</string>
     <string name="search">Поиск</string>
     <string name="back">Назад</string>

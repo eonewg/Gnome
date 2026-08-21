@@ -1,11 +1,14 @@
 package me.mudkip.moememos.ui.component
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
@@ -25,14 +28,14 @@ fun TagDrawerItem(
     tag: String,
     selected: Boolean,
     memosNavController: NavHostController,
-    drawerState: DrawerState? = null
+    drawerState: DrawerState? = null,
 ) {
     val scope = rememberCoroutineScope()
     val colors = MoeMemosDesign.colors
 
     NavigationDrawerItem(
-        label = { Text(tag) },
-        icon = { Icon(Icons.Outlined.Tag, contentDescription = null) },
+        label = { Text(tag, style = MaterialTheme.typography.bodyLarge) },
+        icon = { Icon(Icons.Outlined.Tag, contentDescription = null, modifier = Modifier.size(19.dp)) },
         selected = selected,
         onClick = {
             scope.launch {
@@ -52,6 +55,6 @@ fun TagDrawerItem(
             unselectedIconColor = colors.textSecondary,
             unselectedTextColor = colors.textPrimary,
         ),
-        modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
+        modifier = Modifier.padding(horizontal = 14.dp).height(44.dp),
     )
 }

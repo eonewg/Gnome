@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MoeMemos</string>
+    <string name="app_name">Gnome</string>
     <string name="search">搜尋</string>
     <string name="back">返回</string>
     <string name="memos">靈感</string>
@@ -143,4 +143,7 @@
     <string name="tag_name_hint">不用輸入 #</string>
     <string name="invalid_tag_name">標籤不能為空，也不能包含空格或 #。</string>
     <string name="existing_tags">已有標籤</string>
+    <string name="memo_character_count">字元統計：%1$d</string>
+    <string name="memo_created_time">建立時間：%1$s</string>
+    <string name="memo_last_edited">最後編輯：%1$s</string>
 </resources>

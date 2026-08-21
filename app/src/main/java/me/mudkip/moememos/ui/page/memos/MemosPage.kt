@@ -1,6 +1,8 @@
 package me.mudkip.moememos.ui.page.memos
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -15,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.launch
@@ -66,7 +70,10 @@ fun MemosPage(quickMemoRequestId: Long = 0L) {
             gesturesEnabled = !memoInputActive,
             drawerContent = {
                 ModalDrawerSheet(
+                    modifier = Modifier.fillMaxWidth(0.84f),
+                    drawerShape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp),
                     drawerContainerColor = colors.cardBackground,
+                    drawerTonalElevation = 0.dp,
                 ) {
                     SideDrawer(
                         memosNavController = memosNavController,

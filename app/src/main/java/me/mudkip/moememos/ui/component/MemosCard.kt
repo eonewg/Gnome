@@ -6,32 +6,34 @@ import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.PinDrop
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -49,8 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
@@ -132,6 +136,7 @@ fun MemosCard(
             Row(
                 modifier = Modifier
                     .padding(start = 18.dp, top = 6.dp, end = 6.dp)
+                    .heightIn(min = 40.dp)
                     .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -214,7 +219,7 @@ private fun MemoSelectionIndicator(
     val colors = MoeMemosDesign.colors
     Box(
         modifier = Modifier
-            .size(20.dp)
+            .size(22.dp)
             .then(
                 if (selected) {
                     Modifier.background(colors.accent, CircleShape)
@@ -228,7 +233,7 @@ private fun MemoSelectionIndicator(
             Icon(
                 imageVector = Icons.Filled.Check,
                 contentDescription = null,
-                modifier = Modifier.size(14.dp),
+                modifier = Modifier.size(15.dp),
                 tint = colors.cardBackground,
             )
         }
@@ -252,7 +257,10 @@ fun MemosCardActionButton(
     val colors = MoeMemosDesign.colors
 
     Box {
-        IconButton(onClick = { menuExpanded = true }) {
+        IconButton(
+            onClick = { menuExpanded = true },
+            modifier = Modifier.size(40.dp),
+        ) {
             Icon(
                 Icons.Filled.MoreVert,
                 contentDescription = null,
@@ -260,106 +268,104 @@ fun MemosCardActionButton(
                 tint = colors.textSecondary,
             )
         }
-        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-            if (memo.pinned) {
-                DropdownMenuItem(
-                    text = { Text(R.string.unpin.string) },
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            modifier = Modifier.width(216.dp),
+            shape = RoundedCornerShape(18.dp),
+            containerColor = colors.cardBackground,
+            tonalElevation = 0.dp,
+            shadowElevation = 10.dp,
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                MemoQuickAction(
+                    icon = Icons.Outlined.Share,
+                    label = R.string.share.string,
                     onClick = {
-                        scope.launch {
-                            memosViewModel.updateMemoPinned(memo.identifier, false).suspendOnSuccess {
-                                menuExpanded = false
-                            }
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(Intent.EXTRA_TEXT, memo.content)
+                            type = "text/plain"
                         }
+                        menuExpanded = false
+                        context.startActivity(Intent.createChooser(sendIntent, null))
                     },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.PinDrop,
-                            contentDescription = null
-                        )
-                    })
-            } else {
-                DropdownMenuItem(
-                    text = { Text(R.string.pin.string) },
+                )
+                MemoQuickAction(
+                    icon = Icons.Outlined.Edit,
+                    label = R.string.edit.string,
                     onClick = {
-                        scope.launch {
-                            memosViewModel.updateMemoPinned(memo.identifier, true).suspendOnSuccess {
-                                menuExpanded = false
-                            }
-                        }
+                        menuExpanded = false
+                        rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
                     },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.PushPin,
-                            contentDescription = null
+                )
+                MemoQuickAction(
+                    icon = Icons.Outlined.ContentCopy,
+                    label = R.string.copy.string,
+                    onClick = {
+                        clipboardManager?.setPrimaryClip(
+                            ClipData.newPlainText(memoLabel, memo.content)
                         )
-                    })
+                        menuExpanded = false
+                    },
+                )
             }
+
+            HorizontalDivider(color = colors.divider.copy(alpha = 0.7f))
+
             DropdownMenuItem(
-                text = { Text(R.string.edit.string) },
-                onClick = {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.Edit,
-                        contentDescription = null
+                text = {
+                    Text(
+                        if (memo.pinned) R.string.unpin.string else R.string.pin.string,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
-                })
-            DropdownMenuItem(
-                text = { Text(R.string.share.string) },
+                },
                 onClick = {
-                    val sendIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, memo.content)
-                        type = "text/plain"
+                    scope.launch {
+                        memosViewModel.updateMemoPinned(
+                            memo.identifier,
+                            !memo.pinned,
+                        ).suspendOnSuccess {
+                            menuExpanded = false
+                        }
                     }
-                    val shareIntent = Intent.createChooser(sendIntent, null)
-                    context.startActivity(shareIntent)
                 },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.Share,
-                        contentDescription = null
-                    )
-                })
-            DropdownMenuItem(
-                text = { Text(R.string.copy.string) },
-                onClick = {
-                    clipboardManager?.setPrimaryClip(
-                        ClipData.newPlainText(memoLabel, memo.content)
-                    )
-                    menuExpanded = false
-                },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.ContentCopy,
-                        contentDescription = null
-                    )
-                })
+                contentPadding = MemoActionMenuPadding,
+            )
+
             if (currentAccount !is Account.Local) {
                 DropdownMenuItem(
-                    text = { Text(R.string.copy_link.string) },
+                    text = {
+                        Text(
+                            R.string.copy_link.string,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    },
                     onClick = {
                         memosViewModel.host.value?.let { host ->
                             val memoUrl = "$host/${memo.remoteId ?: memo.identifier}"
-                            val sendIntent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, memoUrl)
-                                type = "text/plain"
-                            }
-                            val shareIntent = Intent.createChooser(sendIntent, null)
-                            context.startActivity(shareIntent)
+                            clipboardManager?.setPrimaryClip(
+                                ClipData.newPlainText(R.string.copy_link.string, memoUrl)
+                            )
                         }
+                        menuExpanded = false
                     },
-                    leadingIcon = {
-                        Icon(
-                            Icons.Outlined.Link,
-                            contentDescription = null
-                        )
-                    })
+                    contentPadding = MemoActionMenuPadding,
+                )
             }
+
             DropdownMenuItem(
-                text = { Text(R.string.archive.string) },
+                text = {
+                    Text(
+                        R.string.archive.string,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                },
                 onClick = {
                     scope.launch {
                         memosViewModel.archiveMemo(memo.identifier).suspendOnSuccess {
@@ -369,30 +375,29 @@ fun MemosCardActionButton(
                 },
                 colors = MenuDefaults.itemColors(
                     textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 ),
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.Archive,
-                        contentDescription = null
-                    )
-                })
+                contentPadding = MemoActionMenuPadding,
+            )
+
             DropdownMenuItem(
-                text = { Text(R.string.delete.string) },
+                text = {
+                    Text(
+                        R.string.delete.string,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                },
                 onClick = {
                     showDeleteDialog = true
                     menuExpanded = false
                 },
                 colors = MenuDefaults.itemColors(
                     textColor = MaterialTheme.colorScheme.error,
-                    leadingIconColor = MaterialTheme.colorScheme.error,
                 ),
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.Delete,
-                        contentDescription = null
-                    )
-                })
+                contentPadding = MemoActionMenuPadding,
+            )
+
+            HorizontalDivider(color = colors.divider.copy(alpha = 0.7f))
+            MemoActionMetadata(memo = memo)
         }
     }
 
@@ -430,7 +435,80 @@ fun MemosCardActionButton(
     }
 }
 
+private val MemoActionMenuPadding = PaddingValues(horizontal = 24.dp, vertical = 0.dp)
+
+@Composable
+private fun MemoQuickAction(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    val colors = MoeMemosDesign.colors
+    Column(
+        modifier = Modifier
+            .width(54.dp)
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(22.dp),
+            tint = colors.textPrimary,
+        )
+        Spacer(modifier = Modifier.height(3.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textPrimary,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+@Composable
+private fun MemoActionMetadata(
+    memo: MemoEntity,
+) {
+    val colors = MoeMemosDesign.colors
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Text(
+            text = stringResource(
+                R.string.memo_character_count,
+                memo.content.memoCharacterCount(),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        Text(
+            text = stringResource(
+                R.string.memo_created_time,
+                memo.date.toMemoTimestamp(),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        Text(
+            text = stringResource(
+                R.string.memo_last_edited,
+                memo.lastModified.toMemoTimestamp(),
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+    }
+}
+
 private val MemoTimestampFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+
+internal fun String.memoCharacterCount(): Int {
+    return codePointCount(0, length)
+}
 
 internal fun java.time.Instant.toMemoTimestamp(): String {
     return MemoTimestampFormatter.format(atZone(ZoneId.systemDefault()))

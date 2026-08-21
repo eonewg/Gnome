@@ -3,11 +3,15 @@ package me.mudkip.moememos.ui.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -47,6 +52,7 @@ import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
 import java.net.URLEncoder
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.format.TextStyle
 import java.time.temporal.WeekFields
 import java.util.Locale
@@ -72,15 +78,9 @@ fun SideDrawer(
     val navBackStackEntry by memosNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val colors = MoeMemosDesign.colors
-    val drawerItemColors = NavigationDrawerItemDefaults.colors(
-        selectedContainerColor = colors.tagBackground,
-        selectedIconColor = colors.tagForeground,
-        selectedTextColor = colors.textPrimary,
-        unselectedContainerColor = Color.Transparent,
-        unselectedIconColor = colors.textSecondary,
-        unselectedTextColor = colors.textPrimary,
-    )
-    val drawerItemShape = RoundedCornerShape(14.dp)
+    val displayName = userStateViewModel.currentUser?.name
+        ?.takeIf { it.isNotBlank() }
+        ?: R.string.moe_memos.string
 
     fun isSelected(route: String): Boolean {
         return currentDestination?.hierarchy?.any { it.route == route } == true
@@ -94,50 +94,72 @@ fun SideDrawer(
         return currentTag == tag || currentTag == encodedTag
     }
 
-    LazyColumn(modifier = Modifier.background(colors.cardBackground)) {
+    fun navigateToDate(date: LocalDate) {
+        scope.launch {
+            memosNavController.navigate("${RouteName.DATE}/$date") {
+                launchSingleTop = true
+                restoreState = true
+            }
+            drawerState?.close()
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxHeight()
+            .background(colors.cardBackground)
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(bottom = 28.dp),
+    ) {
         item {
-            Stats()
+            Column(
+                modifier = Modifier.padding(start = 22.dp, top = 18.dp, end = 22.dp, bottom = 8.dp),
+            ) {
+                Text(
+                    text = displayName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = colors.textPrimary,
+                )
+
+            }
+        }
+
+        item {
+            Stats(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            )
         }
 
         item {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
-                    .padding(10.dp),
+                    .height(126.dp)
+                    .padding(start = 18.dp, top = 10.dp, end = 18.dp, bottom = 10.dp),
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .padding(end = 5.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                        .padding(end = 10.dp),
+                    verticalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(weekDays[0],
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline)
-                    Text(weekDays[3],
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline)
-                    Text(weekDays[6],
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline)
+                    Text(weekDays[0], style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(weekDays[3], style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
+                    Text(weekDays[6], style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
                 }
-                Heatmap()
+                Heatmap(
+                    modifier = Modifier.weight(1f),
+                    onDateClick = ::navigateToDate,
+                )
             }
         }
 
+        item { Spacer(Modifier.height(10.dp)) }
+
         item {
-            Text(
-                R.string.moe_memos.string,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
-                modifier = Modifier.padding(20.dp)
-            )
-        }
-        item {
-            NavigationDrawerItem(
-                label = { Text(R.string.memos.string) },
-                icon = { Icon(Icons.Outlined.GridView, contentDescription = null) },
+            DrawerNavigationItem(
+                label = R.string.memos.string,
+                icon = Icons.Outlined.GridView,
                 selected = isSelected(RouteName.MEMOS),
                 onClick = {
                     scope.launch {
@@ -148,16 +170,14 @@ fun SideDrawer(
                         drawerState?.close()
                     }
                 },
-                shape = drawerItemShape,
-                colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
+
         if (hasExplore) {
             item {
-                NavigationDrawerItem(
-                    label = { Text(R.string.explore.string) },
-                    icon = { Icon(Icons.Outlined.Home, contentDescription = null) },
+                DrawerNavigationItem(
+                    label = R.string.explore.string,
+                    icon = Icons.Outlined.Home,
                     selected = isSelected(RouteName.EXPLORE),
                     onClick = {
                         scope.launch {
@@ -168,16 +188,14 @@ fun SideDrawer(
                             drawerState?.close()
                         }
                     },
-                    shape = drawerItemShape,
-                    colors = drawerItemColors,
-                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
                 )
             }
         }
+
         item {
-            NavigationDrawerItem(
-                label = { Text(R.string.resources.string) },
-                icon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
+            DrawerNavigationItem(
+                label = R.string.resources.string,
+                icon = Icons.Outlined.PhotoLibrary,
                 selected = false,
                 onClick = {
                     scope.launch {
@@ -185,15 +203,13 @@ fun SideDrawer(
                         rootNavController.navigate(RouteName.RESOURCE)
                     }
                 },
-                shape = drawerItemShape,
-                colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
+
         item {
-            NavigationDrawerItem(
-                label = { Text(R.string.archived.string) },
-                icon = { Icon(Icons.Outlined.Inventory2, contentDescription = null) },
+            DrawerNavigationItem(
+                label = R.string.archived.string,
+                icon = Icons.Outlined.Inventory2,
                 selected = isSelected(RouteName.ARCHIVED),
                 onClick = {
                     scope.launch {
@@ -204,15 +220,13 @@ fun SideDrawer(
                         drawerState?.close()
                     }
                 },
-                shape = drawerItemShape,
-                colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
+
         item {
-            NavigationDrawerItem(
-                label = { Text(R.string.settings.string) },
-                icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+            DrawerNavigationItem(
+                label = R.string.settings.string,
+                icon = Icons.Outlined.Settings,
                 selected = false,
                 onClick = {
                     scope.launch {
@@ -220,44 +234,63 @@ fun SideDrawer(
                         rootNavController.navigate(RouteName.SETTINGS)
                     }
                 },
-                shape = drawerItemShape,
-                colors = drawerItemColors,
-                modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding)
             )
         }
 
         item {
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 10.dp),
-                color = colors.divider,
+                modifier = Modifier.padding(top = 18.dp, bottom = 18.dp),
+                color = colors.divider.copy(alpha = 0.72f),
             )
         }
 
         item {
-            Text(
-                R.string.tags.string,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.textPrimary,
-                modifier = Modifier.padding(20.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(R.string.tags.string, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Text(memosViewModel.tags.size.toString(), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+            }
         }
 
-        items(
-            items = memosViewModel.tags,
-            key = { it },
-        ) { tag ->
+        items(items = memosViewModel.tags, key = { it }) { tag ->
             TagDrawerItem(
                 tag = tag,
                 selected = isTagSelected(tag),
                 memosNavController = memosNavController,
-                drawerState = drawerState
+                drawerState = drawerState,
             )
         }
     }
 
     LaunchedEffect(memosViewModel, loadTags) {
-        if (loadTags) {
-            memosViewModel.loadTags()
-        }
+        if (loadTags) memosViewModel.loadTags()
     }
+}
+
+@Composable
+private fun DrawerNavigationItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = MoeMemosDesign.colors
+    NavigationDrawerItem(
+        label = { Text(label, style = MaterialTheme.typography.bodyLarge) },
+        icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) },
+        selected = selected,
+        onClick = onClick,
+        shape = RoundedCornerShape(15.dp),
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = colors.accent,
+            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+            selectedTextColor = MaterialTheme.colorScheme.onPrimary,
+            unselectedContainerColor = Color.Transparent,
+            unselectedIconColor = colors.textSecondary,
+            unselectedTextColor = colors.textPrimary,
+        ),
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 1.dp).height(48.dp),
+    )
 }

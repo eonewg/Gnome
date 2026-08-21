@@ -12,6 +12,7 @@ import androidx.navigation.compose.composable
 import me.mudkip.moememos.data.model.Account
 import me.mudkip.moememos.ui.page.common.RouteName
 import me.mudkip.moememos.viewmodel.LocalUserState
+import java.time.LocalDate
 
 @Composable
 fun MemosNavigation(
@@ -54,6 +55,19 @@ fun MemosNavigation(
                 drawerState = drawerState,
                 tag = entry.arguments?.getString("tag")?.let(Uri::decode) ?: "",
                 navController = navController
+            )
+        }
+
+        composable(
+            "${RouteName.DATE}/{date}"
+        ) { entry ->
+            val date = entry.arguments?.getString("date")
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                ?: LocalDate.now()
+            DateMemoPage(
+                drawerState = drawerState,
+                date = date,
+                navController = navController,
             )
         }
 

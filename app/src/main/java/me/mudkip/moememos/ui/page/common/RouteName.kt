@@ -9,6 +9,7 @@ object RouteName {
     const val ARCHIVED = "archived"
     const val EDIT = "edit"
     const val TAG = "tag"
+    const val DATE = "date"
     const val SEARCH = "search"
     const val MEMO_DETAIL = "memo-detail"
     const val RESOURCE = "resource"
