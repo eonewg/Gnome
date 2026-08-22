@@ -206,6 +206,14 @@ internal fun MemoInputBottomBar(
                     .horizontalScroll(scrollState),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(onClick = onHashTagClick) {
+                    Text(
+                        text = "#",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.textPrimary,
+                    )
+                }
+
                 if (currentAccount !is Account.Local) {
                     Box {
                         DropdownMenu(
@@ -241,14 +249,6 @@ internal fun MemoInputBottomBar(
                             )
                         }
                     }
-                }
-
-                IconButton(onClick = onHashTagClick) {
-                    Text(
-                        text = "#",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = colors.textPrimary,
-                    )
                 }
 
                 IconButton(onClick = onToggleTodoItem) {

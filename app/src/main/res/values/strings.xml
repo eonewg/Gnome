@@ -28,6 +28,9 @@
     <string name="web">Web</string>
     <string name="about">About Gnome</string>
     <string name="add_account">Add Account</string>
+    <string name="sign_in">Sign In</string>
+    <string name="login_subtitle">Sign in to your self-hosted Memos server with an access token.</string>
+    <string name="choose_account_type">How would you like to get started?</string>
     <string name="attachment">Attachment</string>
     <string name="moe_memos" translatable="false">Gnome</string>
     <string name="selected">Selected</string>

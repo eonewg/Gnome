@@ -26,6 +26,9 @@
     <string name="web">官網</string>
     <string name="about">關於 Gnome</string>
     <string name="add_account">登入</string>
+    <string name="sign_in">登入</string>
+    <string name="login_subtitle">使用存取權杖登入你的 Memos 伺服器。</string>
+    <string name="choose_account_type">你想以哪種方式開始使用？</string>
     <string name="attachment">附件</string>
     <string name="selected">已選中</string>
     <string name="username_and_password">使用者名稱與密碼</string>

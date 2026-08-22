@@ -26,6 +26,9 @@
     <string name="web">官网</string>
     <string name="about">关于 Gnome</string>
     <string name="add_account">登录</string>
+    <string name="sign_in">登录</string>
+    <string name="login_subtitle">使用访问令牌登录你的 Memos 服务器。</string>
+    <string name="choose_account_type">你想以哪种方式开始使用？</string>
     <string name="attachment">附件</string>
     <string name="selected">已选择</string>
     <string name="username_and_password">用户名与密码</string>
