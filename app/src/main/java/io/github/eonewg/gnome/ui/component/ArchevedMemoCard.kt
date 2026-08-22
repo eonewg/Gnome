@@ -33,17 +33,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.viewmodel.LocalArchivedMemos
-import io.github.eonewg.gnome.viewmodel.LocalMemos
 
 @Composable
 fun ArchivedMemoCard(
-    memo: MemoEntity
+    memo: MemoEntity,
+    onRestore: suspend (String) -> ApiResponse<Unit>,
+    onDelete: suspend (String) -> ApiResponse<Unit>,
 ) {
     Card(
         modifier = Modifier
@@ -61,7 +62,7 @@ fun ArchivedMemoCard(
                     color = MaterialTheme.colorScheme.outline
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                ArchivedMemosCardActionButton(memo)
+                ArchivedMemosCardActionButton(memo, onRestore = onRestore, onDelete = onDelete)
             }
 
             MemoContent(memo, previewMode = false)
@@ -71,12 +72,12 @@ fun ArchivedMemoCard(
 
 @Composable
 fun ArchivedMemosCardActionButton(
-    memo: MemoEntity
+    memo: MemoEntity,
+    onRestore: suspend (String) -> ApiResponse<Unit>,
+    onDelete: suspend (String) -> ApiResponse<Unit>,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val archivedMemoListViewModel = LocalArchivedMemos.current
-    val memosViewModel = LocalMemos.current
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier
@@ -90,9 +91,8 @@ fun ArchivedMemosCardActionButton(
                 text = { Text(R.string.restore.string) },
                 onClick = {
                     scope.launch {
-                        archivedMemoListViewModel.restoreMemo(memo.identifier).suspendOnSuccess {
+                        onRestore(memo.identifier).suspendOnSuccess {
                             menuExpanded = false
-                            memosViewModel.loadMemos()
                         }
                     }
                 },
@@ -129,7 +129,7 @@ fun ArchivedMemosCardActionButton(
                 TextButton(
                     onClick = {
                         scope.launch {
-                            archivedMemoListViewModel.deleteMemo(memo.identifier).suspendOnSuccess {
+                            onDelete(memo.identifier).suspendOnSuccess {
                                 showDeleteDialog = false
                             }
                         }

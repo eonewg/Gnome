@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.feature.tag
+package io.github.eonewg.gnome.feature.timeline
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -12,56 +12,40 @@ import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * Memos carrying one tag, streamed straight from the Room tag index instead
- * of filtering the timeline snapshot in memory. The tag arrives via
- * [setTag] whenever the destination is re-entered with a new argument.
+ * Memos for one calendar day, streamed from the account's live memo flow;
+ * the date filter itself stays in [io.github.eonewg.gnome.ui.page.memos.MemosList].
  */
 @HiltViewModel
-class TagMemoViewModel @Inject constructor(
+class DateMemoViewModel @Inject constructor(
     private val memoService: MemoService,
     private val accountService: AccountService,
     private val memoActions: MemoActions,
 ) : ViewModel() {
 
-    private val tag = MutableStateFlow<String?>(null)
-
-    val uiState: StateFlow<TagMemoUiState> = combine(
-        tag,
+    val uiState: StateFlow<DateMemoUiState> = combine(
+        memoService.domainMemos,
         accountService.currentAccount,
-    ) { current, account ->
-        current to account
+    ) { memos, account ->
+        memos to account
     }
-        .flatMapLatest { (current, account) ->
-            if (current == null) {
-                flowOf(TagMemoUiState().withAccount(account))
-            } else {
-                memoService.getMemoRepository().observeMemosByTag(current).map { memos ->
-                    TagMemoUiState(tag = current, memos = memos).withAccount(account)
-                }
-            }
+        .map { (memos, account) ->
+            DateMemoUiState(memos = memos).withAccount(account)
         }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = TagMemoUiState(),
+            initialValue = DateMemoUiState(),
         )
 
-    fun setTag(tag: String) {
-        this.tag.value = tag
-    }
-
     // -----------------------------------------------------------------------
-    // Single-memo operations; the Room tag flow re-emits after every write.
+    // Single-memo operations; the live memo flow re-emits after every write.
     // -----------------------------------------------------------------------
 
     suspend fun updateMemoContent(memoId: String, content: String): ApiResponse<Memo> =
@@ -80,7 +64,7 @@ class TagMemoViewModel @Inject constructor(
     suspend fun downloadAndCacheResource(resource: ResourceEntity): Uri? =
         memoActions.downloadAndCache(resource)
 
-    private fun TagMemoUiState.withAccount(account: Account?): TagMemoUiState = copy(
+    private fun DateMemoUiState.withAccount(account: Account?): DateMemoUiState = copy(
         isRemoteAccount = account !is Account.Local,
         host = when (account) {
             is Account.MemosV0 -> account.info.host

@@ -1,5 +1,6 @@
 package io.github.eonewg.gnome.ui.page.memos
 
+import android.net.Uri
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.DrawerState
@@ -20,6 +21,7 @@ import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.feature.tag.TagMemoViewModel
+import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import java.net.URLEncoder
 import kotlinx.coroutines.launch
@@ -35,6 +37,33 @@ fun TagMemoPage(
     val normalizedCurrentTag = remember(tag) { normalizeTag(tag) }
     val tagViewModel: TagMemoViewModel = hiltViewModel()
     val uiState by tagViewModel.uiState.collectAsStateWithLifecycle()
+
+    val memoCardActions = MemoCardActions(
+        onOpen = { memo ->
+            navController.navigate("${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(memo.id)}")
+        },
+        onEdit = { memoId ->
+            navController.navigate("${RouteName.EDIT}?memoId=$memoId")
+        },
+        onTogglePin = { memoId, pinned ->
+            scope.launch { tagViewModel.updateMemoPinned(memoId, pinned) }
+        },
+        onArchive = { memoId ->
+            scope.launch { tagViewModel.archiveMemo(memoId) }
+        },
+        onDelete = { memoId ->
+            scope.launch { tagViewModel.deleteMemo(memoId) }
+        },
+        onUpdateContent = { memoId, content ->
+            scope.launch { tagViewModel.updateMemoContent(memoId, content) }
+        },
+        onCacheResource = { resourceId, uri ->
+            scope.launch { tagViewModel.cacheResourceFile(resourceId, uri) }
+        },
+        onDownloadAndCache = { resource ->
+            tagViewModel.downloadAndCacheResource(resource)
+        },
+    )
 
     LaunchedEffect(tag) {
         tagViewModel.setTag(tag)
@@ -67,7 +96,11 @@ fun TagMemoPage(
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
+                isRemoteAccount = uiState.isRemoteAccount,
+                host = uiState.host,
+                defaultVisibility = uiState.defaultVisibility,
+                actions = memoCardActions,
             )
         }
     )

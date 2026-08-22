@@ -10,7 +10,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -19,37 +18,27 @@ import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalMemos
-import io.github.eonewg.gnome.viewmodel.LocalUserState
-import java.time.LocalDate
-import java.time.OffsetDateTime
-import java.time.temporal.ChronoUnit
 
 @Composable
-fun Stats(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val memosViewModel = LocalMemos.current
-    val userStateViewModel = LocalUserState.current
-    val days = remember(userStateViewModel.currentUser, LocalDate.now()) {
-        userStateViewModel.currentUser?.let { currentUser ->
-            ChronoUnit.DAYS.between(
-                currentUser.startDate.atZone(OffsetDateTime.now().offset).toLocalDate(),
-                LocalDate.now(),
-            )
-        } ?: 0
-    }
-
+fun Stats(
+    memoCount: Int,
+    tagCount: Int,
+    days: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         DrawerStat(
-            value = memosViewModel.memos.size.toString(),
+            value = memoCount.toString(),
             label = R.string.memo.string,
             onClick = onClick,
             modifier = Modifier.weight(1f),
         )
         DrawerStat(
-            value = memosViewModel.tags.size.toString(),
+            value = tagCount.toString(),
             label = R.string.tag.string,
             onClick = onClick,
             modifier = Modifier.weight(1f),

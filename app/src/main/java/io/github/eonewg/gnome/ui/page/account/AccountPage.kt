@@ -30,7 +30,7 @@ import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.viewmodel.AccountViewModel
-import io.github.eonewg.gnome.viewmodel.LocalUserState
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -45,10 +45,10 @@ fun AccountPage(
     val viewModel = hiltViewModel<AccountViewModel, AccountViewModel.AccountViewModelFactory> { factory ->
         factory.create(selectedAccountKey)
     }
-    val userStateViewModel = LocalUserState.current
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val lifecycleOwner = LocalLifecycleOwner.current
     val selectedAccount by viewModel.selectedAccountState.collectAsState()
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
+    val currentAccount by accountSessionViewModel.currentAccount.collectAsState()
     val memosAccount = selectedAccount.toMemosAccount()
     val isLocalAccount = selectedAccountKey == Account.Local().accountKey() || selectedAccount is Account.Local
     val showSwitchAccountButton = selectedAccountKey != currentAccount?.accountKey()
@@ -88,7 +88,7 @@ fun AccountPage(
                 showSwitchAccountButton = showSwitchAccountButton,
                 onSwitchAccount = {
                     coroutineScope.launch {
-                        userStateViewModel.switchAccount(selectedAccountKey)
+                        accountSessionViewModel.switchAccount(selectedAccountKey)
                             .onSuccess {
                                 navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
                             }
@@ -104,11 +104,11 @@ fun AccountPage(
                 innerPadding = innerPadding,
                 account = memosAccount,
                 profile = viewModel.instanceProfile,
-                okHttpClient = userStateViewModel.okHttpClient,
+                okHttpClient = accountSessionViewModel.okHttpClient,
                 showSwitchAccountButton = showSwitchAccountButton,
                 onSwitchAccount = {
                     coroutineScope.launch {
-                        userStateViewModel.switchAccount(selectedAccountKey)
+                        accountSessionViewModel.switchAccount(selectedAccountKey)
                             .onSuccess {
                                 navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
                             }
@@ -116,8 +116,8 @@ fun AccountPage(
                 },
                 onSignOut = {
                     coroutineScope.launch {
-                        userStateViewModel.logout(selectedAccountKey)
-                        if (userStateViewModel.currentAccount.first() == null) {
+                        accountSessionViewModel.logout(selectedAccountKey)
+                        if (accountSessionViewModel.currentAccount.first() == null) {
                             navController.navigate(RouteName.ADD_ACCOUNT) {
                                 popUpTo(navController.graph.id) {
                                     inclusive = true

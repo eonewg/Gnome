@@ -9,10 +9,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -20,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.util.Consumer
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,6 +26,7 @@ import androidx.navigation.compose.rememberNavController
 import io.github.eonewg.gnome.MainActivity
 import io.github.eonewg.gnome.data.model.ShareContent
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import io.github.eonewg.gnome.feature.editor.EditorRoute
 import io.github.eonewg.gnome.ui.page.account.AccountPage
 import io.github.eonewg.gnome.ui.page.account.AddAccountPage
@@ -40,19 +40,17 @@ import io.github.eonewg.gnome.ui.page.settings.SettingsPage
 import io.github.eonewg.gnome.feature.stats.StatsDetailRoute
 import io.github.eonewg.gnome.feature.stats.StatsRoute
 import io.github.eonewg.gnome.ui.theme.GnomeTheme
-import io.github.eonewg.gnome.viewmodel.LocalUserState
 import java.time.LocalDate
 
 @Composable
 fun Navigation() {
     val navController = rememberNavController()
-    val userStateViewModel = LocalUserState.current
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val context = LocalContext.current
     var shareContent by remember { mutableStateOf<ShareContent?>(null) }
     var quickMemoRequestId by remember { mutableStateOf(0L) }
 
-    CompositionLocalProvider(LocalRootNavController provides navController) {
-        GnomeTheme {
+    GnomeTheme {
             NavHost(
                 modifier = Modifier.background(MaterialTheme.colorScheme.surface),
                 navController = navController,
@@ -67,14 +65,14 @@ fun Navigation() {
                 },
             ) {
                 composable(RouteName.MEMOS) {
-                    MemosPage(quickMemoRequestId = quickMemoRequestId)
+                    MemosPage(navController = navController, quickMemoRequestId = quickMemoRequestId)
                 }
 
                 composable("${RouteName.MEMOS}/${RouteName.DATE}/{date}") { entry ->
                     val date = entry.arguments?.getString("date")
                         ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                         ?: LocalDate.now()
-                    MemosPage(initialDate = date)
+                    MemosPage(navController = navController, initialDate = date)
                 }
 
 
@@ -91,16 +89,16 @@ fun Navigation() {
                 }
 
                 composable(RouteName.INPUT) {
-                    EditorRoute()
+                    EditorRoute(navController = navController)
                 }
 
                 composable(RouteName.SHARE) {
-                    EditorRoute(shareContent = shareContent)
+                    EditorRoute(shareContent = shareContent, navController = navController)
                 }
 
                 composable("${RouteName.EDIT}?memoId={id}"
                 ) { entry ->
-                    EditorRoute(memoIdentifier = entry.arguments?.getString("id"))
+                    EditorRoute(memoIdentifier = entry.arguments?.getString("id"), navController = navController)
                 }
 
                 composable(RouteName.RESOURCE) {
@@ -139,12 +137,11 @@ fun Navigation() {
                     }
                 }
             }
-        }
     }
 
 
     LaunchedEffect(Unit) {
-        if (!userStateViewModel.hasAnyAccount()) {
+        if (!accountSessionViewModel.hasAnyAccount()) {
             if (navController.currentDestination?.route != RouteName.ADD_ACCOUNT) {
                 navController.navigate(RouteName.ADD_ACCOUNT) {
                     popUpTo(navController.graph.id) {
@@ -153,9 +150,7 @@ fun Navigation() {
                     launchSingleTop = true
                 }
             }
-            return@LaunchedEffect
         }
-        userStateViewModel.loadCurrentUser()
     }
 
     fun handleIntent(intent: Intent) {
@@ -219,6 +214,3 @@ fun Navigation() {
         }
     }
 }
-
-val LocalRootNavController =
-    compositionLocalOf<NavHostController> { error(io.github.eonewg.gnome.R.string.nav_host_controller_not_found.string) }

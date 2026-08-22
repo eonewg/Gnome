@@ -1,6 +1,7 @@
 package io.github.eonewg.gnome.feature.timeline
 
 import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
 
 /** Immutable snapshot of everything the timeline screen renders. */
@@ -15,6 +16,8 @@ data class TimelineUiState(
     val showBatchDeleteDialog: Boolean = false,
     val syncStatus: SyncStatus = SyncStatus(),
     val isLocalAccount: Boolean = false,
+    val host: String? = null,
+    val defaultVisibility: MemoVisibility? = null,
     val errorMessage: String? = null,
     val syncAlert: TimelineSyncAlert? = null,
 )

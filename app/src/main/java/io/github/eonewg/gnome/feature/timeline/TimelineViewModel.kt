@@ -1,6 +1,7 @@
 package io.github.eonewg.gnome.feature.timeline
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,13 +14,14 @@ import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.data.account.SyncCompatibility
 import io.github.eonewg.gnome.data.constant.GnomeException
 import io.github.eonewg.gnome.data.constant.MemosVersionSupport
+import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.service.AccountService
+import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.ext.getErrorMessage
 import io.github.eonewg.gnome.core.tag.MemosTagParser
-import io.github.eonewg.gnome.viewmodel.ManualSyncResult
 import io.github.eonewg.gnome.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -41,6 +43,7 @@ class TimelineViewModel @Inject constructor(
     private val memoService: MemoService,
     private val accountService: AccountService,
     @param:ApplicationContext private val appContext: Context,
+    private val memoActions: MemoActions,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -78,7 +81,17 @@ class TimelineViewModel @Inject constructor(
         }
         viewModelScope.launch {
             accountService.currentAccount.collect { account ->
-                _uiState.update { it.copy(isLocalAccount = account is Account.Local) }
+                _uiState.update {
+                    it.copy(
+                        isLocalAccount = account is Account.Local,
+                        host = when (account) {
+                            is Account.MemosV0 -> account.info.host
+                            is Account.MemosV1 -> account.info.host
+                            else -> null
+                        },
+                        defaultVisibility = account?.toUser()?.defaultVisibility,
+                    )
+                }
             }
         }
     }
@@ -353,6 +366,21 @@ class TimelineViewModel @Inject constructor(
             response
         }
     }
+
+    /** Checkbox toggles inside the rendered memo keep attachments and visibility. */
+    suspend fun updateMemoContent(memoIdentifier: String, content: String): ApiResponse<Memo> =
+        memoActions.updateContent(memoIdentifier, content).also { response ->
+            if (response is ApiResponse.Success) {
+                applyMemoUpdate(response.data)
+                WidgetUpdater.updateWidgets(appContext)
+            }
+        }
+
+    suspend fun cacheResourceFile(resourceIdentifier: String, downloadedUri: Uri): ApiResponse<Unit> =
+        memoActions.cacheResource(resourceIdentifier, downloadedUri)
+
+    suspend fun downloadAndCacheResource(resource: ResourceEntity): Uri? =
+        memoActions.downloadAndCache(resource)
 
     private fun applyMemoUpdate(memo: Memo) {
         _uiState.update { state ->

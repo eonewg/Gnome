@@ -1,6 +1,5 @@
 package io.github.eonewg.gnome.viewmodel
 
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,6 +48,3 @@ class ArchivedMemoListViewModel @Inject constructor(
         }
     }
 }
-
-val LocalArchivedMemos =
-    compositionLocalOf<ArchivedMemoListViewModel> { error(io.github.eonewg.gnome.R.string.archived_memo_list_view_model_not_found.string) }

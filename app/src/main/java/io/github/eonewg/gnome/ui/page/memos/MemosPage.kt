@@ -19,15 +19,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.launch
+import io.github.eonewg.gnome.feature.drawer.DrawerViewModel
 import io.github.eonewg.gnome.ui.component.SideDrawer
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.time.LocalDate
 
 @Composable
 fun MemosPage(
+    navController: NavHostController,
     quickMemoRequestId: Long = 0L,
     initialDate: LocalDate? = null,
 ) {
@@ -35,6 +40,8 @@ fun MemosPage(
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val memosNavController = rememberNavController()
+    val drawerViewModel: DrawerViewModel = hiltViewModel()
+    val drawerUiState by drawerViewModel.uiState.collectAsStateWithLifecycle()
     val colors = GnomeDesign.colors
     var memoInputActive by rememberSaveable { mutableStateOf(false) }
 
@@ -58,6 +65,8 @@ fun MemosPage(
                 ) {
                     SideDrawer(
                         memosNavController = memosNavController,
+                        uiState = drawerUiState,
+                        rootNavController = navController,
                     )
                 }
             }
@@ -83,7 +92,8 @@ fun MemosPage(
                     SideDrawer(
                         memosNavController = memosNavController,
                         drawerState = drawerState,
-                        loadTags = drawerState.currentValue == DrawerValue.Open,
+                        uiState = drawerUiState,
+                        rootNavController = navController,
                     )
                 }
             }

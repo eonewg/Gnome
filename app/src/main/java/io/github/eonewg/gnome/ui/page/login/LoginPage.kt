@@ -52,7 +52,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
@@ -60,10 +62,10 @@ import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.suspendOnErrorMessage
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
+import io.github.eonewg.gnome.feature.account.LoginCompatibility
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalUserState
-import io.github.eonewg.gnome.viewmodel.LoginCompatibility
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,10 +74,11 @@ fun LoginPage(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val lifecycleOwner = LocalLifecycleOwner.current
-    val userStateViewModel = LocalUserState.current
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
+    val currentAccount by accountSessionViewModel.currentAccount.collectAsStateWithLifecycle()
     val snackbarState = remember { SnackbarHostState() }
     val colors = GnomeDesign.colors
-    val isAddAccount = userStateViewModel.currentUser != null
+    val isAddAccount = currentAccount != null
 
     var accountLabel by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue())
@@ -106,7 +109,7 @@ fun LoginPage(
         host = TextFieldValue(sanitizedHost)
 
         if (!allowHigherV1Version) {
-            when (val compatibility = userStateViewModel.checkLoginCompatibility(sanitizedHost)) {
+            when (val compatibility = accountSessionViewModel.checkLoginCompatibility(sanitizedHost)) {
                 LoginCompatibility.Supported -> Unit
                 is LoginCompatibility.Unsupported -> {
                     snackbarState.showSnackbar(compatibility.message)
@@ -119,7 +122,7 @@ fun LoginPage(
             }
         }
 
-        val resp = userStateViewModel.loginMemosWithAccessToken(
+        val resp = accountSessionViewModel.loginMemosWithAccessToken(
             host = sanitizedHost,
             accessToken = accessToken.text.trim(),
             accountLabel = accountLabel.text,

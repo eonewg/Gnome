@@ -11,8 +11,15 @@ import io.github.eonewg.gnome.data.account.LoginCompatibility
 import io.github.eonewg.gnome.data.account.MemosClientFactory
 import io.github.eonewg.gnome.data.account.ServerCompatibilityChecker
 import io.github.eonewg.gnome.data.account.SyncCompatibility
+import com.skydoves.sandwich.ApiResponse
+import com.skydoves.sandwich.mapSuccess
 import io.github.eonewg.gnome.data.api.MemosV0Api
+import io.github.eonewg.gnome.data.api.MemosV0User
 import io.github.eonewg.gnome.data.api.MemosV1Api
+import io.github.eonewg.gnome.data.api.MemosV1User
+import io.github.eonewg.gnome.data.constant.GnomeException
+import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.data.model.MemosAccount
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
@@ -112,6 +119,82 @@ open class AccountService @Inject constructor(
         session.awaitInitialization()
         val accountKey = currentAccount.first()?.accountKey() ?: return
         accountStore.rememberAcceptedUnsupportedSyncVersion(accountKey, version)
+    }
+
+    /**
+     * Full login flow for the memo input UI: checks server compatibility,
+     * constructs the version-specific client, fetches the user, persists the
+     * account and switches to it.
+     */
+    suspend fun loginMemosWithAccessToken(
+        host: String,
+        accessToken: String,
+        accountLabel: String = "",
+        allowHigherV1Version: Boolean = false,
+    ): ApiResponse<Unit> {
+        return try {
+            val compatibility = checkLoginCompatibility(host, allowHigherV1Version)
+            val accountCase = when (compatibility) {
+                is LoginCompatibility.Supported -> compatibility.accountCase
+                is LoginCompatibility.Unsupported ->
+                    return ApiResponse.exception(GnomeException(compatibility.message))
+                is LoginCompatibility.RequiresConfirmation ->
+                    return ApiResponse.exception(GnomeException(compatibility.message))
+            }
+            when (accountCase) {
+                UserData.AccountCase.MEMOS_V1 -> {
+                    val resp = createMemosV1Client(host, accessToken).second.getCurrentUser()
+                    if (resp !is ApiResponse.Success) {
+                        return resp.mapSuccess {}
+                    }
+                    val user = resp.data.user
+                    if (user == null) {
+                        return ApiResponse.exception(GnomeException.notLogin)
+                    }
+                    addAccount(
+                        Account.MemosV1(
+                            MemosAccount(
+                                host = host,
+                                accessToken = accessToken,
+                                name = user.username,
+                                avatarUrl = user.avatarUrl ?: "",
+                                startDateEpochSecond = user.createTime?.epochSecond ?: 0L,
+                                accountLabel = accountLabel.trim(),
+                                remoteIdentifier = user.name,
+                            )
+                        )
+                    )
+                    ApiResponse.Success(Unit)
+                }
+                UserData.AccountCase.MEMOS_V0 -> {
+                    val resp = createMemosV0Client(host, accessToken).second.me()
+                    if (resp !is ApiResponse.Success) {
+                        return resp.mapSuccess {}
+                    }
+                    val user = resp.data
+                    addAccount(
+                        Account.MemosV0(
+                            MemosAccount(
+                                host = host,
+                                accessToken = accessToken,
+                                remoteIdentifier = user.id.toString(),
+                                name = user.username ?: user.displayName,
+                                avatarUrl = user.avatarUrl ?: "",
+                                startDateEpochSecond = user.createdTs,
+                                defaultVisibility = MemoVisibility.entries
+                                    .firstOrNull { it.name == (user.toUser().defaultVisibility.name) }
+                                    ?.name ?: MemoVisibility.PRIVATE.name,
+                                accountLabel = accountLabel.trim(),
+                            )
+                        )
+                    )
+                    ApiResponse.Success(Unit)
+                }
+                else -> ApiResponse.exception(GnomeException.invalidServer)
+            }
+        } catch (e: Throwable) {
+            ApiResponse.exception(e)
+        }
     }
 
     suspend fun detectAccountCase(host: String): UserData.AccountCase {

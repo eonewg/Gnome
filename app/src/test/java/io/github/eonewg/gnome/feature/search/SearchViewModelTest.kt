@@ -6,6 +6,7 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.feature.FakeAccountService
 import io.github.eonewg.gnome.feature.FakeMemoRepository
 import io.github.eonewg.gnome.feature.FakeMemoService
+import io.github.eonewg.gnome.data.service.MemoActions
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -51,6 +52,11 @@ class SearchViewModelTest {
     private fun newViewModel() = SearchViewModel(
         memoService = memoService,
         accountService = accountService,
+        memoActions = MemoActions(
+            memoService = memoService,
+            accountService = accountService,
+            appContext = RuntimeEnvironment.getApplication(),
+        ),
     )
 
     private fun memo(id: String, content: String) = Memo(

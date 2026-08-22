@@ -13,12 +13,12 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.core.model.toCore
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.ShareContent
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
-import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
-import io.github.eonewg.gnome.viewmodel.LocalUserState
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 
 /**
  * Host wiring for the shared editor core. Used by the timeline bottom sheet,
@@ -32,24 +32,24 @@ fun EditorRoute(
     onFinished: (() -> Unit)? = null,
     presentation: EditorPresentation = EditorPresentation.FullScreen,
     active: Boolean = true,
+    navController: NavHostController? = null,
 ) {
     val viewModel: EditorViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    val userStateViewModel = LocalUserState.current
-    val navController = LocalRootNavController.current
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val lifecycleOwner = LocalLifecycleOwner.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
     val snackbarState = remember { SnackbarHostState() }
 
     fun exitEditor() {
-        onFinished?.invoke() ?: navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+        onFinished?.invoke() ?: navController?.popBackStackIfLifecycleIsResumed(lifecycleOwner)
     }
 
     LaunchedEffect(Unit) {
         val defaultVisibility = (
-            userStateViewModel.currentUser?.defaultVisibility
+            accountSessionViewModel.currentAccount.value?.toUser()?.defaultVisibility
                 ?: MemoVisibility.PRIVATE
             ).toCore()
         viewModel.start(memoIdentifier, shareContent, defaultVisibility)
@@ -58,7 +58,7 @@ fun EditorRoute(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                EditorEvent.Submitted -> onFinished?.invoke() ?: navController.popBackStack()
+                EditorEvent.Submitted -> onFinished?.invoke() ?: navController?.popBackStack()
                 EditorEvent.Refocus -> focusRequester.requestFocus()
                 is EditorEvent.ShowMessage -> snackbarState.showSnackbar(event.message)
             }

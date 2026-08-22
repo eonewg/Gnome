@@ -32,11 +32,8 @@ import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.MemoRepresentable
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.media.MediaViewerActivity
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalUserState
 import io.github.eonewg.gnome.core.tag.MemosTagParser
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
@@ -56,23 +53,16 @@ fun MemoContent(
     isPreviewExpanded: Boolean = false,
     onPreviewExpandedChange: ((Boolean) -> Unit)? = null,
     selectable: Boolean = false,
-    onTagClick: ((String) -> Unit)? = null
+    onTagClick: ((String) -> Unit)? = null,
+    imageBaseUrl: String? = null,
+    actions: MemoCardActions = MemoCardActions(),
 ) {
-    val rootNavController = LocalRootNavController.current
     val colors = GnomeDesign.colors
     val (text, previewed) = remember(memo.content, previewMode, isPreviewExpanded) {
         if (previewMode && !isPreviewExpanded) {
             extractPreviewContent(markdownText = memo.content)
         } else {
             Pair(memo.content, false)
-        }
-    }
-    val handleTagClick = remember(rootNavController, onTagClick) {
-        onTagClick ?: { tag ->
-            rootNavController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
-                launchSingleTop = true
-                restoreState = true
-            }
         }
     }
 
@@ -82,19 +72,19 @@ fun MemoContent(
         if (selectable || requiresRichMarkdown(text)) {
             Markdown(
                 text,
-                imageBaseUrl = LocalUserState.current.host,
+                imageBaseUrl = imageBaseUrl,
                 checkboxChange = checkboxChange,
                 selectable = selectable,
-                onTagClick = handleTagClick
+                onTagClick = onTagClick
             )
         } else {
             PlainMemoText(
                 text = text,
-                onTagClick = handleTagClick,
+                onTagClick = onTagClick,
             )
         }
 
-        MemoResourceContent(memo)
+        MemoResourceContent(memo, actions)
 
         if ((previewed || previewMode && isPreviewExpanded) && onPreviewExpandedChange != null) {
             Row(modifier = Modifier.padding(top = 10.dp)) {
@@ -114,7 +104,7 @@ fun MemoContent(
 @Composable
 private fun PlainMemoText(
     text: String,
-    onTagClick: (String) -> Unit,
+    onTagClick: ((String) -> Unit)?,
 ) {
     val colors = GnomeDesign.colors
     val uriHandler = LocalUriHandler.current
@@ -129,7 +119,7 @@ private fun PlainMemoText(
         LinkInteractionListener { link ->
             val url = (link as? LinkAnnotation.Url)?.url ?: return@LinkInteractionListener
             if (url.startsWith(PlainTagLinkPrefix)) {
-                onTagClick(Uri.decode(url.removePrefix(PlainTagLinkPrefix)))
+                onTagClick?.invoke(Uri.decode(url.removePrefix(PlainTagLinkPrefix)))
             } else {
                 uriHandler.openUri(url)
             }
@@ -360,7 +350,10 @@ private fun isPreviewWhitespaceToken(node: ASTNode): Boolean {
 }
 
 @Composable
-fun MemoResourceContent(memo: MemoRepresentable) {
+fun MemoResourceContent(
+    memo: MemoRepresentable,
+    actions: MemoCardActions = MemoCardActions(),
+) {
     val cols = 3
     val context = LocalContext.current
     val imageList = memo.resources.filter { it.mimeType?.startsWith("image/") == true }
@@ -382,6 +375,7 @@ fun MemoResourceContent(memo: MemoRepresentable) {
                                     .padding(3.dp)
                                     .clip(RoundedCornerShape(12.dp)),
                                 resourceIdentifier = (imageList[index] as? ResourceEntity)?.identifier,
+                                onCacheResource = actions.onCacheResource,
                                 onClick = {
                                     context.startActivity(
                                         Intent(context, MediaViewerActivity::class.java).apply {
@@ -401,6 +395,6 @@ fun MemoResourceContent(memo: MemoRepresentable) {
         }
     }
     memo.resources.filterNot { it.mimeType?.startsWith("image/") == true }.forEach { resource ->
-        Attachment(resource)
+        Attachment(resource, onDownloadAndCache = actions.onDownloadAndCache)
     }
 }

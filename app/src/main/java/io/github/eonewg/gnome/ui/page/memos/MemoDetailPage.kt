@@ -29,7 +29,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,22 +40,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.ext.icon
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
+import io.github.eonewg.gnome.feature.memo.MemoDetailViewModel
+import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.component.MemoContent
 import io.github.eonewg.gnome.core.model.toDomain
 import io.github.eonewg.gnome.ui.component.MemosCardActionButton
 import io.github.eonewg.gnome.ui.component.toMemoTimestamp
+import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalMemos
-import io.github.eonewg.gnome.viewmodel.LocalUserState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,15 +67,33 @@ fun MemoDetailPage(
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val layoutDirection = LocalLayoutDirection.current
-    val memosViewModel = LocalMemos.current
-    val userStateViewModel = LocalUserState.current
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
+    val memoDetailViewModel: MemoDetailViewModel = hiltViewModel()
+    val uiState by memoDetailViewModel.uiState.collectAsStateWithLifecycle()
+    val memo = uiState.memo
     val scope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
-    val memo = remember(memosViewModel.memos.toList(), memoIdentifier) {
-        memosViewModel.memos.firstOrNull { it.identifier == memoIdentifier }
-    }
     var hadMemo by rememberSaveable(memoIdentifier) { mutableStateOf(false) }
+
+    val memoCardActions = MemoCardActions(
+        onEdit = { id ->
+            navController.navigate("${RouteName.EDIT}?memoId=$id")
+        },
+        onTogglePin = { _, pinned ->
+            scope.launch { memoDetailViewModel.updateMemoPinned(pinned) }
+        },
+        onArchive = {
+            scope.launch { memoDetailViewModel.archiveMemo() }
+        },
+        onDelete = {
+            scope.launch { memoDetailViewModel.deleteMemo() }
+        },
+        onCacheResource = { resourceId, uri ->
+            scope.launch { memoDetailViewModel.cacheResourceFile(resourceId, uri) }
+        },
+        onDownloadAndCache = { resource ->
+            memoDetailViewModel.downloadAndCacheResource(resource)
+        },
+    )
 
     LaunchedEffect(memo?.identifier) {
         when {
@@ -108,7 +127,14 @@ fun MemoDetailPage(
                     }
                 },
                 actions = {
-                    memo?.let { MemosCardActionButton(it.toDomain(it.resources)) }
+                    memo?.let {
+                        MemosCardActionButton(
+                            memo = it.toDomain(it.resources),
+                            isRemoteAccount = uiState.isRemoteAccount,
+                            host = uiState.host,
+                            actions = memoCardActions,
+                        )
+                    }
                 }
             )
         }
@@ -158,7 +184,7 @@ fun MemoDetailPage(
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.textSecondary,
                         )
-                        if (currentAccount !is Account.Local && memo.needsSync) {
+                        if (uiState.isRemoteAccount && memo.needsSync) {
                             Icon(
                                 imageVector = Icons.Outlined.CloudOff,
                                 contentDescription = R.string.memo_sync_pending.string,
@@ -167,7 +193,7 @@ fun MemoDetailPage(
                                     .size(18.dp),
                             )
                         }
-                        if (userStateViewModel.currentUser?.defaultVisibility != memo.visibility) {
+                        if (uiState.defaultVisibility != memo.visibility) {
                             Icon(
                                 imageVector = memo.visibility.icon,
                                 contentDescription = stringResource(memo.visibility.titleResource),
@@ -182,6 +208,8 @@ fun MemoDetailPage(
                     MemoContent(
                         memo = memo,
                         selectable = true,
+                        imageBaseUrl = uiState.host,
+                        actions = memoCardActions,
                         checkboxChange = { checked, startOffset, endOffset ->
                             scope.launch {
                                 var text = memo.content.substring(startOffset, endOffset)
@@ -190,11 +218,8 @@ fun MemoDetailPage(
                                 } else {
                                     text.replace("[x]", "[ ]")
                                 }
-                                memosViewModel.editMemo(
-                                    memo.identifier,
-                                    memo.content.replaceRange(startOffset, endOffset, text),
-                                    memo.resources,
-                                    memo.visibility
+                                memoDetailViewModel.updateMemoContent(
+                                    memo.content.replaceRange(startOffset, endOffset, text)
                                 )
                             }
                         }

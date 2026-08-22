@@ -11,10 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -35,7 +33,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.data.model.MemoEditGesture
 import io.github.eonewg.gnome.data.model.Settings
 import io.github.eonewg.gnome.ext.settingsDataStore
@@ -44,13 +43,7 @@ import io.github.eonewg.gnome.feature.timeline.MemoSortOrder
 import io.github.eonewg.gnome.feature.timeline.memoMatchesDate
 import io.github.eonewg.gnome.feature.timeline.orderMemosForTimeline
 import io.github.eonewg.gnome.ui.component.MemosCard
-import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
 import io.github.eonewg.gnome.ui.util.edgeToEdgeContentPadding
-import io.github.eonewg.gnome.ui.page.common.RouteName
-import io.github.eonewg.gnome.viewmodel.LocalMemos
-import io.github.eonewg.gnome.viewmodel.LocalUserState
-import io.github.eonewg.gnome.viewmodel.ManualSyncResult
-import timber.log.Timber
 import java.time.LocalDate
 import java.time.OffsetDateTime
 
@@ -69,13 +62,13 @@ fun MemosList(
     selectedMemoIds: Set<String> = emptySet(),
     onSelectionToggle: ((Memo) -> Unit)? = null,
     loadOnStart: Boolean = true,
+    isRemoteAccount: Boolean = false,
+    host: String? = null,
+    defaultVisibility: MemoVisibility? = null,
+    actions: MemoCardActions = MemoCardActions(),
 ) {
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
-    val navController = LocalRootNavController.current
-    val viewModel = LocalMemos.current
-    val userStateViewModel = LocalUserState.current
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
     val settings by context.settingsDataStore.data.collectAsState(initial = Settings())
     val editGesture = settings.usersList
         .firstOrNull { it.accountKey == settings.currentUser }
@@ -84,7 +77,6 @@ fun MemosList(
     val refreshState = rememberPullToRefreshState()
     val scope = rememberCoroutineScope()
     var isRefreshing by remember { mutableStateOf(false) }
-    var syncAlert by remember { mutableStateOf<PullRefreshSyncAlert?>(null) }
     val localOffset = remember { OffsetDateTime.now().offset }
     val filteredMemos by remember(memos, date, sortOrder, localOffset) {
         derivedStateOf {
@@ -118,22 +110,7 @@ fun MemosList(
         onRefresh = {
             isRefreshing = true
             scope.launch {
-                if (onRefresh != null) {
-                    onRefresh()
-                } else {
-                    when (val result = viewModel.refreshMemos()) {
-                        ManualSyncResult.Completed -> Unit
-                        is ManualSyncResult.Blocked -> {
-                            syncAlert = PullRefreshSyncAlert.Blocked(result.message)
-                        }
-                        is ManualSyncResult.RequiresConfirmation -> {
-                            syncAlert = PullRefreshSyncAlert.RequiresConfirmation(result.version, result.message)
-                        }
-                        is ManualSyncResult.Failed -> {
-                            syncAlert = PullRefreshSyncAlert.Failed(result.message)
-                        }
-                    }
-                }
+                onRefresh?.invoke()
                 isRefreshing = false
             }
         },
@@ -155,14 +132,13 @@ fun MemosList(
             ) { memo ->
                 MemosCard(
                     memo = memo,
-                    onClick = { selectedMemo ->
-                        navController.navigate(
-                            "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.id)}"
-                        )
-                    },
                     editGesture = if (selectionMode) MemoEditGesture.NONE else editGesture ?: MemoEditGesture.NONE,
                     previewMode = true,
-                    showSyncStatus = currentAccount !is Account.Local,
+                    showSyncStatus = isRemoteAccount,
+                    isRemoteAccount = isRemoteAccount,
+                    host = host,
+                    defaultVisibility = defaultVisibility,
+                    actions = actions,
                     onTagClick = if (selectionMode) null else onTagClick,
                     selectionMode = selectionMode,
                     selected = memo.id in selectedMemoIds,
@@ -172,15 +148,9 @@ fun MemosList(
         }
     }
 
-    LaunchedEffect(viewModel.errorMessage) {
-        viewModel.errorMessage?.let {
-            Timber.d(it)
-        }
-    }
-
     if (loadOnStart) {
         LaunchedEffect(Unit) {
-            viewModel.loadMemos()
+            onRefresh?.invoke()
         }
     }
 
@@ -191,73 +161,4 @@ fun MemosList(
 
         listTopId = filteredMemos.firstOrNull()?.id
     }
-
-    when (val alert = syncAlert) {
-        null -> Unit
-        is PullRefreshSyncAlert.Blocked -> {
-            AlertDialog(
-                onDismissRequest = { syncAlert = null },
-                title = { Text(R.string.unsupported_memos_version_title.string) },
-                text = { Text(alert.message) },
-                confirmButton = {
-                    TextButton(onClick = { syncAlert = null }) {
-                        Text(R.string.close.string)
-                    }
-                }
-            )
-        }
-        is PullRefreshSyncAlert.RequiresConfirmation -> {
-            AlertDialog(
-                onDismissRequest = { syncAlert = null },
-                title = { Text(R.string.unsupported_memos_version_title.string) },
-                text = { Text(alert.message) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            syncAlert = null
-                            scope.launch {
-                                when (val result = viewModel.refreshMemos(alert.version)) {
-                                    ManualSyncResult.Completed -> Unit
-                                    is ManualSyncResult.Blocked -> {
-                                        syncAlert = PullRefreshSyncAlert.Blocked(result.message)
-                                    }
-                                    is ManualSyncResult.RequiresConfirmation -> {
-                                        syncAlert = PullRefreshSyncAlert.RequiresConfirmation(result.version, result.message)
-                                    }
-                                    is ManualSyncResult.Failed -> {
-                                        syncAlert = PullRefreshSyncAlert.Failed(result.message)
-                                    }
-                                }
-                            }
-                        }
-                    ) {
-                        Text(R.string.still_sync.string)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { syncAlert = null }) {
-                        Text(R.string.cancel.string)
-                    }
-                }
-            )
-        }
-        is PullRefreshSyncAlert.Failed -> {
-            AlertDialog(
-                onDismissRequest = { syncAlert = null },
-                title = { Text(R.string.sync_failed.string) },
-                text = { Text(alert.message) },
-                confirmButton = {
-                    TextButton(onClick = { syncAlert = null }) {
-                        Text(R.string.close.string)
-                    }
-                }
-            )
-        }
-    }
-}
-
-private sealed class PullRefreshSyncAlert {
-    data class Blocked(val message: String) : PullRefreshSyncAlert()
-    data class RequiresConfirmation(val version: String, val message: String) : PullRefreshSyncAlert()
-    data class Failed(val message: String) : PullRefreshSyncAlert()
 }

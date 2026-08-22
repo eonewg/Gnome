@@ -42,7 +42,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,28 +55,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.SyncState
-import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoEditGesture
+import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.ext.icon
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
-import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalMemos
-import io.github.eonewg.gnome.viewmodel.LocalUserState
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
 fun MemosCard(
     memo: Memo,
-    onClick: (Memo) -> Unit,
     editGesture: MemoEditGesture = MemoEditGesture.NONE,
     previewMode: Boolean = false,
     showSyncStatus: Boolean = false,
@@ -85,9 +78,11 @@ fun MemosCard(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     onSelectionToggle: ((Memo) -> Unit)? = null,
+    isRemoteAccount: Boolean = false,
+    host: String? = null,
+    defaultVisibility: MemoVisibility? = null,
+    actions: MemoCardActions = MemoCardActions(),
 ) {
-    val memosViewModel = LocalMemos.current
-    val rootNavController = LocalRootNavController.current
     val scope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
     val representable = remember(memo) { memo.toRepresentable() }
@@ -100,22 +95,18 @@ fun MemosCard(
                 if (selectionMode) {
                     onSelectionToggle?.invoke(memo)
                 } else if (editGesture == MemoEditGesture.SINGLE) {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
+                    actions.onEdit(memo.id)
                 } else {
-                    onClick(memo)
+                    actions.onOpen(memo)
                 }
             },
             onLongClick = if (editGesture == MemoEditGesture.LONG) {
-                {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
-                }
+                { actions.onEdit(memo.id) }
             } else {
                 null
             },
             onDoubleClick = if (editGesture == MemoEditGesture.DOUBLE) {
-                {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
-                }
+                { actions.onEdit(memo.id) }
             } else {
                 null
             }
@@ -161,7 +152,7 @@ fun MemosCard(
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
-                if (LocalUserState.current.currentUser?.defaultVisibility != representable.visibility) {
+                if (defaultVisibility != representable.visibility) {
                     Icon(
                         representable.visibility.icon,
                         contentDescription = stringResource(representable.visibility.titleResource),
@@ -173,13 +164,20 @@ fun MemosCard(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 if (!selectionMode) {
-                    MemosCardActionButton(memo)
+                    MemosCardActionButton(
+                        memo,
+                        isRemoteAccount = isRemoteAccount,
+                        host = host,
+                        actions = actions,
+                    )
                 }
             }
 
             MemoContent(
                 representable,
                 previewMode = previewMode,
+                imageBaseUrl = host,
+                actions = actions,
                 checkboxChange = { checked, startOffset, endOffset ->
                     if (selectionMode) {
                         onSelectionToggle?.invoke(memo)
@@ -192,11 +190,9 @@ fun MemosCard(
                         } else {
                             text.replace("[x]", "[ ]")
                         }
-                        memosViewModel.editMemo(
+                        actions.onUpdateContent(
                             memo.id,
                             memo.content.replaceRange(startOffset, endOffset, text),
-                            memo.attachments,
-                            memo.visibility
                         )
                     }
                 },
@@ -245,15 +241,13 @@ private fun MemoSelectionIndicator(
 @Composable
 fun MemosCardActionButton(
     memo: Memo,
+    isRemoteAccount: Boolean = false,
+    host: String? = null,
+    actions: MemoCardActions = MemoCardActions(),
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val clipboardManager = context.getSystemService(ClipboardManager::class.java)
-    val memosViewModel = LocalMemos.current
-    val userStateViewModel = LocalUserState.current
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
-    val rootNavController = LocalRootNavController.current
-    val scope = rememberCoroutineScope()
     var showDeleteDialog by remember { mutableStateOf(false) }
     val memoLabel = stringResource(R.string.memo)
     val colors = GnomeDesign.colors
@@ -303,7 +297,7 @@ fun MemosCardActionButton(
                     label = R.string.edit.string,
                     onClick = {
                         menuExpanded = false
-                        rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
+                        actions.onEdit(memo.id)
                     },
                 )
                 MemoQuickAction(
@@ -328,19 +322,13 @@ fun MemosCardActionButton(
                     )
                 },
                 onClick = {
-                    scope.launch {
-                        memosViewModel.updateMemoPinned(
-                            memo.id,
-                            !memo.pinned,
-                        ).suspendOnSuccess {
-                            menuExpanded = false
-                        }
-                    }
+                    menuExpanded = false
+                    actions.onTogglePin(memo.id, !memo.pinned)
                 },
                 contentPadding = MemoActionMenuPadding,
             )
 
-            if (currentAccount !is Account.Local) {
+            if (isRemoteAccount) {
                 DropdownMenuItem(
                     text = {
                         Text(
@@ -349,7 +337,7 @@ fun MemosCardActionButton(
                         )
                     },
                     onClick = {
-                        memosViewModel.host.value?.let { host ->
+                        host?.let { host ->
                             val memoUrl = "$host/${memo.remoteId ?: memo.id}"
                             clipboardManager?.setPrimaryClip(
                                 ClipData.newPlainText(R.string.copy_link.string, memoUrl)
@@ -369,11 +357,8 @@ fun MemosCardActionButton(
                     )
                 },
                 onClick = {
-                    scope.launch {
-                        memosViewModel.archiveMemo(memo.id).suspendOnSuccess {
-                            menuExpanded = false
-                        }
-                    }
+                    menuExpanded = false
+                    actions.onArchive(memo.id)
                 },
                 colors = MenuDefaults.itemColors(
                     textColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -410,11 +395,8 @@ fun MemosCardActionButton(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        scope.launch {
-                            memosViewModel.deleteMemo(memo.id).suspendOnSuccess {
-                                showDeleteDialog = false
-                            }
-                        }
+                        showDeleteDialog = false
+                        actions.onDelete(memo.id)
                     },
                     colors = ButtonDefaults.buttonColors(
                         contentColor = MaterialTheme.colorScheme.error,

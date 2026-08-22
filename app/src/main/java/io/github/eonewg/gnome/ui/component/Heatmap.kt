@@ -18,7 +18,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.data.model.DailyUsageStat
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalMemos
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
@@ -29,11 +28,10 @@ import kotlin.math.floor
 
 @Composable
 fun Heatmap(
+    matrix: List<DailyUsageStat>,
     modifier: Modifier = Modifier,
     onDateClick: (LocalDate) -> Unit = {},
 ) {
-    val memosViewModel = LocalMemos.current
-    val matrix = memosViewModel.matrix
     val colors = GnomeDesign.colors
     val density = LocalDensity.current
     val gapPx = with(density) { 3.dp.toPx() }

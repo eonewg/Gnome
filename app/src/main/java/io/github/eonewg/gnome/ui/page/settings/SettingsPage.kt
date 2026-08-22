@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,7 +53,7 @@ import io.github.eonewg.gnome.ui.component.MemosIcon
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.security.AppLockAuthenticator
 import io.github.eonewg.gnome.ui.security.AppLockSession
-import io.github.eonewg.gnome.viewmodel.LocalUserState
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,13 +61,13 @@ fun SettingsPage(
     navController: NavHostController
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
-    val userStateViewModel = LocalUserState.current
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
-    val accounts by userStateViewModel.accounts.collectAsState()
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
+    val accounts by accountSessionViewModel.accounts.collectAsState()
+    val currentAccount by accountSessionViewModel.currentAccount.collectAsState()
     val settings by context.settingsDataStore.data.collectAsState(initial = Settings())
     val appLockSupported = remember(context, AppLockSession.foregroundGeneration) {
         AppLockAuthenticator.canAuthenticate(context)

@@ -63,7 +63,9 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.component.SyncStatusBadge
 import io.github.eonewg.gnome.ui.page.memos.MemosList
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
@@ -98,6 +100,10 @@ fun TimelineScreen(
     onDismissSyncAlert: () -> Unit,
     onConfirmSyncWithVersion: (String) -> Unit,
     onTagClick: (String) -> Unit,
+    isRemoteAccount: Boolean,
+    host: String?,
+    defaultVisibility: MemoVisibility?,
+    actions: MemoCardActions,
 ) {
     val colors = GnomeDesign.colors
     var homeMenuExpanded by remember { mutableStateOf(false) }
@@ -228,6 +234,10 @@ fun TimelineScreen(
                 onRefresh = onRefresh,
                 onTagClick = onTagClick,
                 loadOnStart = false,
+                isRemoteAccount = isRemoteAccount,
+                host = host,
+                defaultVisibility = defaultVisibility,
+                actions = actions,
             )
         }
     )

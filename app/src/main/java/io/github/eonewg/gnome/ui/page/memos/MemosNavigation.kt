@@ -4,16 +4,17 @@ import android.net.Uri
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import io.github.eonewg.gnome.feature.search.SearchRoute
 import io.github.eonewg.gnome.feature.timeline.TimelineRoute
 import io.github.eonewg.gnome.ui.page.common.RouteName
-import io.github.eonewg.gnome.viewmodel.LocalUserState
 import java.time.LocalDate
 
 @Composable
@@ -24,8 +25,8 @@ fun MemosNavigation(
     onMemoInputActiveChange: (Boolean) -> Unit = {},
     initialDate: LocalDate? = null,
 ) {
-    val userStateViewModel = LocalUserState.current
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
+    val currentAccount by accountSessionViewModel.currentAccount.collectAsStateWithLifecycle()
     val hasExplore = currentAccount !is Account.Local
 
     NavHost(

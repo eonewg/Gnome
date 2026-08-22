@@ -1,6 +1,5 @@
 package io.github.eonewg.gnome.feature.search
 
-import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +38,7 @@ import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.page.memos.MemosList
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
@@ -52,6 +52,7 @@ fun SearchScreen(
     onQueryChange: (String) -> Unit,
     onIncludeArchivedChange: (Boolean) -> Unit,
     navController: NavHostController,
+    actions: MemoCardActions,
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusRequester = remember { FocusRequester() }
@@ -181,7 +182,11 @@ fun SearchScreen(
                                     launchSingleTop = true
                                     restoreState = true
                                 }
-                            }
+                            },
+                            isRemoteAccount = uiState.isRemoteAccount,
+                            host = uiState.host,
+                            defaultVisibility = uiState.defaultVisibility,
+                            actions = actions,
                         )
                     }
                 }

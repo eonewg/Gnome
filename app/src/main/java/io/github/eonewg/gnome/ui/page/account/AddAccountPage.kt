@@ -28,6 +28,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -46,15 +47,15 @@ import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalUserState
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddAccountPage(
     navController: NavHostController,
 ) {
-    val userStateViewModel = LocalUserState.current
-    val accounts by userStateViewModel.accounts.collectAsState()
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
+    val accounts by accountSessionViewModel.accounts.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
@@ -140,7 +141,7 @@ fun AddAccountPage(
                         icon = Icons.Outlined.Home,
                         onClick = {
                             coroutineScope.launch {
-                                userStateViewModel.addLocalAccount()
+                                accountSessionViewModel.addLocalAccount()
                                     .suspendOnSuccess { toMemos() }
                             }
                         },

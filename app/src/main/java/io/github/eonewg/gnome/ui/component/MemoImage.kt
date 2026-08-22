@@ -18,7 +18,6 @@ import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
-import io.github.eonewg.gnome.viewmodel.LocalMemos
 import timber.log.Timber
 import java.io.File
 
@@ -29,10 +28,10 @@ fun MemoImage(
     modifier: Modifier = Modifier,
     resourceIdentifier: String? = null,
     onClick: (() -> Unit)? = null,
+    onCacheResource: (resourceId: String, uri: Uri) -> Unit = { _, _ -> },
 ) {
     var diskCacheFile: File? by remember { mutableStateOf(null) }
     val context = LocalContext.current
-    val memosViewModel = LocalMemos.current
     val scope = rememberCoroutineScope()
     val imageLoader = remember(context) { SingletonImageLoader.get(context) }
 
@@ -87,7 +86,7 @@ fun MemoImage(
                     modelUri.scheme != "file"
                 if (shouldPersistDownloadedFile) {
                     scope.launch {
-                        memosViewModel.cacheResourceFile(resourceIdentifier, Uri.fromFile(downloadedFile))
+                        onCacheResource(resourceIdentifier, Uri.fromFile(downloadedFile))
                     }
                 }
             }

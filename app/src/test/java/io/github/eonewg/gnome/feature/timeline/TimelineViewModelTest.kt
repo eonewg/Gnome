@@ -8,6 +8,7 @@ import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.feature.FakeAccountService
 import io.github.eonewg.gnome.feature.FakeMemoRepository
 import io.github.eonewg.gnome.feature.FakeMemoService
+import io.github.eonewg.gnome.data.service.MemoActions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -66,6 +67,11 @@ class TimelineViewModelTest {
             memoService = memoService,
             accountService = accountService,
             appContext = RuntimeEnvironment.getApplication(),
+            memoActions = MemoActions(
+                memoService = memoService,
+                accountService = accountService,
+                appContext = RuntimeEnvironment.getApplication(),
+            ),
             savedStateHandle = savedStateHandle,
         )
 

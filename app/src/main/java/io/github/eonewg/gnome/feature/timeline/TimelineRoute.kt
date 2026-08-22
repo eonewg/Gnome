@@ -3,6 +3,7 @@ package io.github.eonewg.gnome.feature.timeline
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.net.Uri
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -50,6 +51,7 @@ import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.feature.editor.EditorPresentation
 import io.github.eonewg.gnome.feature.editor.EditorRoute
+import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import kotlinx.coroutines.launch
@@ -68,6 +70,34 @@ fun TimelineRoute(
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    val memoCardActions = MemoCardActions(
+        onOpen = { memo ->
+            navController.navigate("${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(memo.id)}")
+        },
+        onEdit = { memoId ->
+            navController.navigate("${RouteName.EDIT}?memoId=$memoId")
+        },
+        onTogglePin = { memoId, pinned ->
+            scope.launch { timelineViewModel.updateMemoPinned(memoId, pinned) }
+        },
+        onArchive = { memoId ->
+            scope.launch { timelineViewModel.archiveMemo(memoId) }
+        },
+        onDelete = { memoId ->
+            scope.launch { timelineViewModel.deleteMemo(memoId) }
+        },
+        onUpdateContent = { memoId, content ->
+            scope.launch { timelineViewModel.updateMemoContent(memoId, content) }
+        },
+        onCacheResource = { resourceId, uri ->
+            scope.launch { timelineViewModel.cacheResourceFile(resourceId, uri) }
+        },
+        onDownloadAndCache = { resource ->
+            timelineViewModel.downloadAndCacheResource(resource)
+        },
+    )
+
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     val context = LocalContext.current
@@ -221,6 +251,10 @@ fun TimelineRoute(
                     restoreState = true
                 }
             },
+            isRemoteAccount = !uiState.isLocalAccount,
+            host = uiState.host,
+            defaultVisibility = uiState.defaultVisibility,
+            actions = memoCardActions,
         )
 
         // Keep the editor composed from the initial timeline composition. Doing this behind the

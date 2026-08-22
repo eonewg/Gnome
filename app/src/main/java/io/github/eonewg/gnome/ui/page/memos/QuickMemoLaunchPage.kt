@@ -33,9 +33,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,18 +54,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.flow.first
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.toMemoTimestamp
+import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import io.github.eonewg.gnome.feature.editor.EditorPresentation
+import io.github.eonewg.gnome.feature.memo.QuickMemoViewModel
 import io.github.eonewg.gnome.feature.editor.EditorRoute
-import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.ui.theme.GnomeTheme
-import io.github.eonewg.gnome.viewmodel.LocalUserState
-import io.github.eonewg.gnome.viewmodel.LocalMemos
 
 /** Minimal first composition used only when Quick Settings starts a cold app process. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,8 +71,9 @@ import io.github.eonewg.gnome.viewmodel.LocalMemos
 fun QuickMemoLaunchPage(onFinished: () -> Unit) {
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
-    val userStateViewModel = LocalUserState.current
-    val memosViewModel = LocalMemos.current
+    val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
+    val quickMemoViewModel: QuickMemoViewModel = hiltViewModel()
+    val memos by quickMemoViewModel.memos.collectAsState()
     val navController = rememberNavController()
     val imeInsets = WindowInsets.ime
     val imeBottom = imeInsets.getBottom(LocalDensity.current)
@@ -89,10 +91,7 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
         val colors = GnomeDesign.colors
         val scrimInteractionSource = remember { MutableInteractionSource() }
         val inputInteractionSource = remember { MutableInteractionSource() }
-        androidx.compose.runtime.CompositionLocalProvider(
-            LocalRootNavController provides navController,
-        ) {
-            Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize()) {
                 Scaffold(
                     containerColor = colors.appBackground,
                     topBar = {
@@ -145,7 +144,7 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         items(
-                            items = memosViewModel.memos
+                            items = memos
                                 .sortedByDescending { it.pinned }
                                 .take(6),
                             key = { it.identifier },
@@ -254,11 +253,11 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
                             presentation = EditorPresentation.BottomSheet,
                             onFinished = { finishCapture() },
                             active = true,
+                            navController = navController,
                         )
                     }
                 }
             }
-        }
     }
 
     LaunchedEffect(imeBottom) {
@@ -271,16 +270,10 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        if (!userStateViewModel.hasAnyAccount()) {
+        if (!accountSessionViewModel.hasAnyAccount()) {
             finishCapture()
-            return@LaunchedEffect
         }
-        // MemosViewModel already observes the account-specific Room data. Wait briefly for that
-        // single local flow instead of issuing a second full database read during IME startup.
-        withTimeoutOrNull(700) {
-            snapshotFlow { memosViewModel.memos }
-                .first { it.isNotEmpty() }
-        }
-        memosViewModel.loadTags()
+        // The editor loads its own tag suggestions from the Room tag index,
+        // so the old MemosViewModel warm-up is no longer needed here.
     }
 }

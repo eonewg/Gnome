@@ -29,8 +29,6 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -42,13 +40,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
+import io.github.eonewg.gnome.feature.drawer.DrawerUiState
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.viewmodel.LocalMemos
-import io.github.eonewg.gnome.viewmodel.LocalUserState
 import java.net.URLEncoder
 import java.time.LocalDate
 
@@ -56,20 +51,14 @@ import java.time.LocalDate
 fun SideDrawer(
     memosNavController: NavHostController,
     drawerState: DrawerState? = null,
-    loadTags: Boolean = true,
+    uiState: DrawerUiState = DrawerUiState(),
+    rootNavController: NavHostController,
 ) {
     val scope = rememberCoroutineScope()
-    val memosViewModel = LocalMemos.current
-    val userStateViewModel = LocalUserState.current
-    val currentAccount by userStateViewModel.currentAccount.collectAsState()
-    val hasExplore = currentAccount !is Account.Local
-    val rootNavController = LocalRootNavController.current
     val navBackStackEntry by memosNavController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
     val colors = GnomeDesign.colors
-    val displayName = userStateViewModel.currentUser?.name
-        ?.takeIf { it.isNotBlank() }
-        ?: R.string.gnome.string
+    val displayName = uiState.displayName.ifBlank { R.string.gnome.string }
 
     fun isSelected(route: String): Boolean {
         return currentDestination?.hierarchy?.any { it.route == route } == true
@@ -115,6 +104,9 @@ fun SideDrawer(
 
         item {
             Stats(
+                memoCount = uiState.memoCount,
+                tagCount = uiState.tags.size,
+                days = uiState.days,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
                 onClick = {
                     scope.launch {
@@ -129,6 +121,7 @@ fun SideDrawer(
 
         item {
             Heatmap(
+                matrix = uiState.matrix,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(126.dp)
@@ -156,7 +149,7 @@ fun SideDrawer(
             )
         }
 
-        if (hasExplore) {
+        if (uiState.isRemoteAccount) {
             item {
                 DrawerNavigationItem(
                     label = R.string.explore.string,
@@ -233,11 +226,11 @@ fun SideDrawer(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(R.string.tags.string, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
-                Text(memosViewModel.tags.size.toString(), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                Text(uiState.tags.size.toString(), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
             }
         }
 
-        items(items = memosViewModel.tags, key = { it }) { tag ->
+        items(items = uiState.tags, key = { it }) { tag ->
             TagDrawerItem(
                 tag = tag,
                 selected = isTagSelected(tag),
@@ -245,10 +238,6 @@ fun SideDrawer(
                 drawerState = drawerState,
             )
         }
-    }
-
-    LaunchedEffect(memosViewModel, loadTags) {
-        if (loadTags) memosViewModel.loadTags()
     }
 }
 
