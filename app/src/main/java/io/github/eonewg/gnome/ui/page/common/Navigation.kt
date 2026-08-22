@@ -19,22 +19,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.util.Consumer
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.eonewg.gnome.MainActivity
 import io.github.eonewg.gnome.data.model.ShareContent
+import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import io.github.eonewg.gnome.feature.editor.EditorRoute
 import io.github.eonewg.gnome.ui.page.account.AccountPage
 import io.github.eonewg.gnome.ui.page.account.AddAccountPage
 import io.github.eonewg.gnome.ui.page.login.LoginPage
-import io.github.eonewg.gnome.ui.page.memos.MemoDetailPage
 import io.github.eonewg.gnome.ui.page.memos.MemosPage
+import io.github.eonewg.gnome.feature.memo.MemoDetailRoute
 import io.github.eonewg.gnome.feature.search.SearchRoute
-import io.github.eonewg.gnome.ui.page.memos.TagMemoPage
+import io.github.eonewg.gnome.feature.tag.TagMemoRoute
 import io.github.eonewg.gnome.ui.page.resource.ResourceListPage
 import io.github.eonewg.gnome.ui.page.settings.SettingsPage
 import io.github.eonewg.gnome.feature.stats.StatsDetailRoute
@@ -102,7 +104,10 @@ fun Navigation() {
                 }
 
                 composable(RouteName.RESOURCE) {
-                    ResourceListPage(navController = navController)
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    ResourceListPage(onBack = {
+                        navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                    })
                 }
 
                 composable("${RouteName.ACCOUNT}?accountKey={accountKey}") { entry ->
@@ -127,13 +132,13 @@ fun Navigation() {
 
                 composable("${RouteName.TAG}/{tag}") { entry ->
                     val tag = entry.arguments?.getString("tag")?.let(Uri::decode) ?: ""
-                    TagMemoPage(tag = tag, navController = navController)
+                    TagMemoRoute(tag = tag, navController = navController)
                 }
 
                 composable("${RouteName.MEMO_DETAIL}?memoId={memoId}") { entry ->
                     val memoId = entry.arguments?.getString("memoId")
                     if (memoId != null) {
-                        MemoDetailPage(navController = navController, memoIdentifier = Uri.decode(memoId))
+                        MemoDetailRoute(memoIdentifier = Uri.decode(memoId), navController = navController)
                     }
                 }
             }

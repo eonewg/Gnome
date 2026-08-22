@@ -3,7 +3,7 @@ package io.github.eonewg.gnome.feature.memo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.service.MemoService
 import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,7 +20,7 @@ class QuickMemoViewModel @Inject constructor(
     private val memoService: MemoService,
 ) : ViewModel() {
 
-    val memos: StateFlow<List<MemoEntity>> = memoService.memos
+    val memos: StateFlow<List<Memo>> = memoService.domainMemos
         .map { it.sortedByDescending { memo -> memo.pinned } }
         .stateIn(
             scope = viewModelScope,

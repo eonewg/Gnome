@@ -29,7 +29,6 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.MemoRepresentable
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.media.MediaViewerActivity
@@ -374,7 +373,7 @@ fun MemoResourceContent(
                                     .aspectRatio(1f)
                                     .padding(3.dp)
                                     .clip(RoundedCornerShape(12.dp)),
-                                resourceIdentifier = (imageList[index] as? ResourceEntity)?.identifier,
+                                resourceIdentifier = imageList[index].identifier,
                                 onCacheResource = actions.onCacheResource,
                                 onClick = {
                                     context.startActivity(

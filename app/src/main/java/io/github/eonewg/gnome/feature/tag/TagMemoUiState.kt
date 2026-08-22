@@ -1,7 +1,7 @@
 package io.github.eonewg.gnome.feature.tag
 
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.MemoVisibility
 
 /** Immutable snapshot of the per-tag memo list. */
 data class TagMemoUiState(

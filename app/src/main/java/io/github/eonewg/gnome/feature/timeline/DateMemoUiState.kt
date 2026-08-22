@@ -1,7 +1,7 @@
 package io.github.eonewg.gnome.feature.timeline
 
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.MemoVisibility
 
 /** Immutable snapshot of the per-date memo list; the date filter lives in the UI. */
 data class DateMemoUiState(

@@ -14,8 +14,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.core.model.toCore
-import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.ShareContent
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
@@ -48,10 +48,9 @@ fun EditorRoute(
     }
 
     LaunchedEffect(Unit) {
-        val defaultVisibility = (
-            accountSessionViewModel.currentAccount.value?.toUser()?.defaultVisibility
+        val defaultVisibility =
+            accountSessionViewModel.currentAccount.value?.toUser()?.defaultVisibility?.toCore()
                 ?: MemoVisibility.PRIVATE
-            ).toCore()
         viewModel.start(memoIdentifier, shareContent, defaultVisibility)
     }
 

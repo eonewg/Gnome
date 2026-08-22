@@ -3,6 +3,8 @@ package io.github.eonewg.gnome.data.model
 import java.time.Instant
 
 interface ResourceRepresentable {
+    /** Local identifier — the stable key for caching and attachment ops. */
+    val identifier: String
     val remoteId: String?
     val date: Instant
     val filename: String

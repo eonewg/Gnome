@@ -39,20 +39,27 @@ io.github.eonewg.gnome
 依赖方向：`feature → (repository / sync status) → (data.local / data.remote) / sync`。
 feature 不感知 MemosV0/V1、Room schema、Repository 实现细节。
 
-进度注记（2026-08-22，Phase 16 完成）：`core/model`、`data/local/LocalMemoDataSource`、
+进度注记（2026-08-22，Phase 16.5 完成）：`core/model`、`data/local/LocalMemoDataSource`、
 `data/remote(/memos)`、`data/account`（AccountStore / AccountSession / 客户端与数据源
 工厂 / ServerCompatibilityChecker / AccountExportService，AccountService 仅剩门面）、
 domain 契约 `data/repository/MemoRepository`（core.model 出参，`MemoRepositoryImpl`
 同时保留 entity adapter）与 sync 层均已落地。feature 层 `feature/timeline`
-（TimelineRoute/ViewModel/UiState/Screen）、`feature/editor`
+（Timeline/DateMemo 的 Route/ViewModel/UiState/Screen）、`feature/editor`
 （EditorRoute/ViewModel/UiState/Screen，四个入口共享同一核心）、`feature/tag`
-（Room 标签索引 + 编辑器自动补全）、`feature/search`（Room LIKE 搜索）、
-`feature/stats`、`feature/memo`（MemoDetail/QuickMemo）、`feature/drawer`
-（抽屉统计/热力图/标签）、`feature/account`（AccountSessionViewModel）均已上线；
-卡片交互由宿主页面的 `MemoCardActions` 提供。业务 CompositionLocal 全部移除
-（LocalMemos / LocalUserState / LocalRootNavController / LocalArchivedMemos），
-legacy VM（MemosViewModel / UserStateViewModel）已删除；单 memo 写操作统一经
-`data/service/MemoActions` 委托 MemoRepository。详见 [refactor-plan.md](refactor-plan.md)。
+（Room 标签索引 + TagMemo Screen/Route）、`feature/search`（Room LIKE 搜索）、
+`feature/stats`、`feature/memo`（MemoDetail Route/ViewModel/UiState + QuickMemo）、
+`feature/explore`（ExploreMemo 展示模型）、`feature/drawer`（抽屉统计/热力图/标签）、
+`feature/account`（AccountSessionViewModel）均已上线；卡片交互由宿主 Route 的
+`MemoCardActions` 提供。业务 CompositionLocal 全部移除（LocalMemos / LocalUserState
+/ LocalRootNavController / LocalArchivedMemos），legacy VM（MemosViewModel /
+UserStateViewModel）已删除；单 memo 写操作统一经 `data/service/MemoActions` 委托
+MemoRepository。Feature/UI 层不再引用 Room entity 或 wire DTO：列表读走
+`MemoRepository` 领域流（observeTimeline / observeArchived / observeMemosByTag /
+observeSearch / observeAttachments），附件链统一 `ResourceRepresentable`（含
+identifier），visibility presentation 扩展在 `core.model.MemoVisibility` 上；
+导航只发生在 Route 层（SideDrawer 等组件为纯回调）。仍在 Navigation 3 范围内收口：
+根图目的页面（Login/AddAccount/Account/Settings）与 QuickMemoActivity 宿主继续
+持有各自 NavHostController。详见 [refactor-plan.md](refactor-plan.md)。
 
 ## 数据与同步模型
 

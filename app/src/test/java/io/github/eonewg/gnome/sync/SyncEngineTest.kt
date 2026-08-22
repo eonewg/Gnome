@@ -447,6 +447,12 @@ class FakeMemoDao : MemoDao {
     override fun observeAllMemos(accountKey: String): Flow<List<MemoWithResources>> =
         flowOf(emptyList())
 
+    override fun observeArchivedMemos(accountKey: String): Flow<List<MemoWithResources>> =
+        flowOf(emptyList())
+
+    override fun observeAllResources(accountKey: String): Flow<List<ResourceEntity>> =
+        flowOf(emptyList())
+
     override suspend fun getAllMemosForSync(accountKey: String): List<MemoEntity> =
         memos.values.filter { it.accountKey == accountKey }
 

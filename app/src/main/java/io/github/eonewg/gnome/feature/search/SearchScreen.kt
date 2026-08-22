@@ -33,16 +33,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.page.memos.MemosList
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import java.net.URLEncoder
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,10 +46,10 @@ fun SearchScreen(
     uiState: SearchUiState,
     onQueryChange: (String) -> Unit,
     onIncludeArchivedChange: (Boolean) -> Unit,
-    navController: NavHostController,
+    onBack: () -> Unit,
+    onTagClick: (String) -> Unit,
     actions: MemoCardActions,
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
     val focusRequester = remember { FocusRequester() }
     val colors = GnomeDesign.colors
     var searchText by rememberSaveable(stateSaver = TextFieldValue.Saver) {
@@ -117,7 +112,7 @@ fun SearchScreen(
                 },
                 actions = {
                     TextButton(
-                        onClick = { navController.popBackStackIfLifecycleIsResumed(lifecycleOwner) }
+                        onClick = onBack
                     ) {
                         Text(
                             text = R.string.cancel.string,
@@ -177,12 +172,7 @@ fun SearchScreen(
                             memos = uiState.results,
                             contentPadding = innerPadding,
                             loadOnStart = false,
-                            onTagClick = { tag ->
-                                navController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
+                            onTagClick = onTagClick,
                             isRemoteAccount = uiState.isRemoteAccount,
                             host = uiState.host,
                             defaultVisibility = uiState.defaultVisibility,

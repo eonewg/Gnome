@@ -37,11 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.time.LocalDate
 import java.time.Year
@@ -59,9 +55,10 @@ private enum class StatsPeriod {
 @Composable
 fun StatsScreen(
     uiState: StatsUiState,
-    navController: NavHostController,
+    onBack: () -> Unit,
+    onShowDetail: () -> Unit,
+    onDateClick: (LocalDate) -> Unit,
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
     val colors = GnomeDesign.colors
     val zoneId = remember { ZoneId.systemDefault() }
     val currentMonth = remember(zoneId) { YearMonth.now(zoneId) }
@@ -81,9 +78,7 @@ fun StatsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
-                        onClick = {
-                            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
-                        },
+                        onClick = onBack,
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
@@ -117,7 +112,7 @@ fun StatsScreen(
                         }
                     }
                     TextButton(
-                        onClick = { navController.navigate(RouteName.STATS_DETAIL) },
+                        onClick = onShowDetail,
                     ) {
                         Text(
                             text = stringResource(R.string.stats_more),
@@ -137,12 +132,7 @@ fun StatsScreen(
             when (period) {
                 StatsPeriod.MONTH -> MonthStatsList(
                     months = snapshot.monthsThrough(currentMonth),
-                    onDateClick = { date ->
-                        navController.navigate("${RouteName.MEMOS}/${RouteName.DATE}/$date") {
-                            popUpTo(RouteName.STATS) { inclusive = true }
-                            launchSingleTop = true
-                        }
-                    },
+                    onDateClick = onDateClick,
                 )
                 StatsPeriod.YEAR -> YearStatsList(
                     years = snapshot.yearsThrough(Year.from(currentMonth)),

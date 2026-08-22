@@ -11,11 +11,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.toCore
 import io.github.eonewg.gnome.data.account.SyncCompatibility
 import io.github.eonewg.gnome.data.constant.GnomeException
 import io.github.eonewg.gnome.data.constant.MemosVersionSupport
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
@@ -89,7 +90,7 @@ class TimelineViewModel @Inject constructor(
                             is Account.MemosV1 -> account.info.host
                             else -> null
                         },
-                        defaultVisibility = account?.toUser()?.defaultVisibility,
+                        defaultVisibility = account?.toUser()?.defaultVisibility?.toCore(),
                     )
                 }
             }
@@ -379,7 +380,7 @@ class TimelineViewModel @Inject constructor(
     suspend fun cacheResourceFile(resourceIdentifier: String, downloadedUri: Uri): ApiResponse<Unit> =
         memoActions.cacheResource(resourceIdentifier, downloadedUri)
 
-    suspend fun downloadAndCacheResource(resource: ResourceEntity): Uri? =
+    suspend fun downloadAndCacheResource(resource: ResourceRepresentable): Uri? =
         memoActions.downloadAndCache(resource)
 
     private fun applyMemoUpdate(memo: Memo) {

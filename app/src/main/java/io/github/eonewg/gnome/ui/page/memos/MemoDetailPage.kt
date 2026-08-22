@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -41,31 +41,27 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.icon
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
 import io.github.eonewg.gnome.feature.memo.MemoDetailViewModel
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.component.MemoContent
-import io.github.eonewg.gnome.core.model.toDomain
 import io.github.eonewg.gnome.ui.component.MemosCardActionButton
 import io.github.eonewg.gnome.ui.component.toMemoTimestamp
-import io.github.eonewg.gnome.ui.page.common.RouteName
+import io.github.eonewg.gnome.ui.component.toRepresentable
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemoDetailPage(
-    navController: NavHostController,
-    memoIdentifier: String
+    memoIdentifier: String,
+    onBack: () -> Unit,
+    onEditMemo: (memoId: String) -> Unit,
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
     val layoutDirection = LocalLayoutDirection.current
     val memoDetailViewModel: MemoDetailViewModel = hiltViewModel()
     val uiState by memoDetailViewModel.uiState.collectAsStateWithLifecycle()
@@ -76,7 +72,7 @@ fun MemoDetailPage(
 
     val memoCardActions = MemoCardActions(
         onEdit = { id ->
-            navController.navigate("${RouteName.EDIT}?memoId=$id")
+            onEditMemo(id)
         },
         onTogglePin = { _, pinned ->
             scope.launch { memoDetailViewModel.updateMemoPinned(pinned) }
@@ -95,10 +91,10 @@ fun MemoDetailPage(
         },
     )
 
-    LaunchedEffect(memo?.identifier) {
+    LaunchedEffect(memo?.id) {
         when {
             memo != null -> hadMemo = true
-            hadMemo -> navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+            hadMemo -> onBack()
         }
     }
 
@@ -118,7 +114,7 @@ fun MemoDetailPage(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStackIfLifecycleIsResumed(lifecycleOwner) }) {
+                    IconButton(onClick = onBack) {
                         Icon(
                             Icons.AutoMirrored.Outlined.ArrowBack,
                             contentDescription = R.string.back.string,
@@ -129,7 +125,7 @@ fun MemoDetailPage(
                 actions = {
                     memo?.let {
                         MemosCardActionButton(
-                            memo = it.toDomain(it.resources),
+                            memo = it,
                             isRemoteAccount = uiState.isRemoteAccount,
                             host = uiState.host,
                             actions = memoCardActions,
@@ -184,7 +180,7 @@ fun MemoDetailPage(
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.textSecondary,
                         )
-                        if (uiState.isRemoteAccount && memo.needsSync) {
+                        if (uiState.isRemoteAccount && memo.syncState != io.github.eonewg.gnome.core.model.SyncState.SYNCED) {
                             Icon(
                                 imageVector = Icons.Outlined.CloudOff,
                                 contentDescription = R.string.memo_sync_pending.string,
@@ -206,7 +202,7 @@ fun MemoDetailPage(
                     }
 
                     MemoContent(
-                        memo = memo,
+                        memo = memo.toRepresentable(),
                         selectable = true,
                         imageBaseUrl = uiState.host,
                         actions = memoCardActions,

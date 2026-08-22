@@ -22,7 +22,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,13 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.MemoImage
+import io.github.eonewg.gnome.ui.component.toResourceRepresentable
 import io.github.eonewg.gnome.viewmodel.ResourceListViewModel
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredGridItems
@@ -50,22 +48,20 @@ private enum class ResourceFilter {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResourceListPage(
-    navController: NavHostController,
+    onBack: () -> Unit,
     viewModel: ResourceListViewModel = hiltViewModel()
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val resources by viewModel.resources.collectAsStateWithLifecycle()
     var selectedFilter by rememberSaveable { mutableStateOf(ResourceFilter.IMAGE) }
-    val imageResources = viewModel.resources.filter { it.mimeType?.startsWith("image/") == true }
-    val otherResources = viewModel.resources.filterNot { it.mimeType?.startsWith("image/") == true }
+    val imageResources = resources.filter { it.mimeType?.startsWith("image/") == true }
+    val otherResources = resources.filterNot { it.mimeType?.startsWith("image/") == true }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(text = R.string.resources.string) },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
-                    }) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
                     }
                 },
@@ -106,10 +102,10 @@ fun ResourceListPage(
                     verticalItemSpacing = 10.dp,
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    staggeredGridItems(imageResources, key = { it.identifier }) { resource ->
+                    staggeredGridItems(imageResources, key = { it.id }) { resource ->
                         MemoImage(
                             url = resource.localUri ?: resource.uri,
-                            resourceIdentifier = resource.identifier,
+                            resourceIdentifier = resource.id,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
@@ -124,15 +120,11 @@ fun ResourceListPage(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    lazyItems(otherResources, key = { it.identifier }) { resource ->
-                        Attachment(resource = resource)
+                    lazyItems(otherResources, key = { it.id }) { resource ->
+                        Attachment(resource = resource.toResourceRepresentable())
                     }
                 }
             }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.loadResources()
     }
 }

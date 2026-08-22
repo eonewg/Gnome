@@ -1,5 +1,6 @@
 package io.github.eonewg.gnome.ui.page.memos
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,12 +23,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.feature.drawer.DrawerViewModel
 import io.github.eonewg.gnome.ui.component.SideDrawer
+import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
+import java.net.URLEncoder
 import java.time.LocalDate
 
 @Composable
@@ -42,8 +46,84 @@ fun MemosPage(
     val memosNavController = rememberNavController()
     val drawerViewModel: DrawerViewModel = hiltViewModel()
     val drawerUiState by drawerViewModel.uiState.collectAsStateWithLifecycle()
+    val navBackStackEntry by memosNavController.currentBackStackEntryAsState()
     val colors = GnomeDesign.colors
     var memoInputActive by rememberSaveable { mutableStateOf(false) }
+
+    val selectedRoute = navBackStackEntry?.destination?.route
+    val selectedTag = navBackStackEntry?.arguments?.getString("tag")?.let(Uri::decode)
+
+    fun drawerNavigate(action: () -> Unit) {
+        scope.launch {
+            action()
+            drawerState.close()
+        }
+    }
+
+    val drawerContent: @Composable () -> Unit = {
+        SideDrawer(
+            uiState = drawerUiState,
+            selectedRoute = selectedRoute,
+            selectedTag = selectedTag,
+            onStatsClick = {
+                drawerNavigate {
+                    navController.navigate(RouteName.STATS) {
+                        launchSingleTop = true
+                    }
+                }
+            },
+            onMemosClick = {
+                drawerNavigate {
+                    memosNavController.navigate(RouteName.MEMOS) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+            onExploreClick = {
+                drawerNavigate {
+                    memosNavController.navigate(RouteName.EXPLORE) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+            onResourcesClick = {
+                drawerNavigate {
+                    navController.navigate(RouteName.RESOURCE)
+                }
+            },
+            onArchivedClick = {
+                drawerNavigate {
+                    memosNavController.navigate(RouteName.ARCHIVED) {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+            onSettingsClick = {
+                drawerNavigate {
+                    navController.navigate(RouteName.SETTINGS)
+                }
+            },
+            onTagClick = { tag ->
+                drawerNavigate {
+                    memosNavController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+            onDateClick = { date ->
+                drawerNavigate {
+                    memosNavController.navigate("${RouteName.DATE}/$date") {
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+            },
+        )
+    }
 
     LaunchedEffect(memoInputActive) {
         if (memoInputActive && drawerState.isOpen) {
@@ -63,11 +143,7 @@ fun MemosPage(
                 PermanentDrawerSheet(
                     drawerContainerColor = colors.cardBackground,
                 ) {
-                    SideDrawer(
-                        memosNavController = memosNavController,
-                        uiState = drawerUiState,
-                        rootNavController = navController,
-                    )
+                    drawerContent()
                 }
             }
         ) {
@@ -89,12 +165,7 @@ fun MemosPage(
                     drawerContainerColor = colors.cardBackground,
                     drawerTonalElevation = 0.dp,
                 ) {
-                    SideDrawer(
-                        memosNavController = memosNavController,
-                        drawerState = drawerState,
-                        uiState = drawerUiState,
-                        rootNavController = navController,
-                    )
+                    drawerContent()
                 }
             }
         ) {

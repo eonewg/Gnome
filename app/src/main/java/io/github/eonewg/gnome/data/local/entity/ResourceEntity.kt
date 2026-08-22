@@ -25,7 +25,7 @@ import java.time.Instant
 )
 data class ResourceEntity(
     @PrimaryKey
-    val identifier: String,
+    override val identifier: String,
     override val remoteId: String? = null,
     val accountKey: String,
     override val date: Instant,

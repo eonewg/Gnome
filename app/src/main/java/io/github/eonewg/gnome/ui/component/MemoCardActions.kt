@@ -2,7 +2,7 @@ package io.github.eonewg.gnome.ui.component
 
 import android.net.Uri
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
+import io.github.eonewg.gnome.data.model.ResourceRepresentable
 
 /**
  * The mutable operations a memo card can trigger, supplied by the hosting
@@ -25,5 +25,5 @@ data class MemoCardActions(
     /** Persists a downloaded attachment file into the local cache. */
     val onCacheResource: (resourceId: String, uri: Uri) -> Unit = { _, _ -> },
     /** Downloads and caches an HTTP attachment; null leaves the fetch disabled. */
-    val onDownloadAndCache: (suspend (ResourceEntity) -> Uri?)? = null,
+    val onDownloadAndCache: (suspend (ResourceRepresentable) -> Uri?)? = null,
 )

@@ -1,7 +1,7 @@
 package io.github.eonewg.gnome.feature.search
 
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.MemoVisibility
 
 /** Immutable snapshot of the search screen state. */
 data class SearchUiState(

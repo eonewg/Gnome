@@ -37,12 +37,12 @@ import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.ext.string
 
 @Composable
 fun ArchivedMemoCard(
-    memo: MemoEntity,
+    memo: Memo,
     onRestore: suspend (String) -> ApiResponse<Unit>,
     onDelete: suspend (String) -> ApiResponse<Unit>,
 ) {
@@ -65,14 +65,14 @@ fun ArchivedMemoCard(
                 ArchivedMemosCardActionButton(memo, onRestore = onRestore, onDelete = onDelete)
             }
 
-            MemoContent(memo, previewMode = false)
+            MemoContent(memo.toRepresentable(), previewMode = false)
         }
     }
 }
 
 @Composable
 fun ArchivedMemosCardActionButton(
-    memo: MemoEntity,
+    memo: Memo,
     onRestore: suspend (String) -> ApiResponse<Unit>,
     onDelete: suspend (String) -> ApiResponse<Unit>,
 ) {
@@ -91,7 +91,7 @@ fun ArchivedMemosCardActionButton(
                 text = { Text(R.string.restore.string) },
                 onClick = {
                     scope.launch {
-                        onRestore(memo.identifier).suspendOnSuccess {
+                        onRestore(memo.id).suspendOnSuccess {
                             menuExpanded = false
                         }
                     }
@@ -129,7 +129,7 @@ fun ArchivedMemosCardActionButton(
                 TextButton(
                     onClick = {
                         scope.launch {
-                            onDelete(memo.identifier).suspendOnSuccess {
+                            onDelete(memo.id).suspendOnSuccess {
                                 showDeleteDialog = false
                             }
                         }

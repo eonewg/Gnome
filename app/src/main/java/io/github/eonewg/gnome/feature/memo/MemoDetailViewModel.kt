@@ -7,8 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.skydoves.sandwich.ApiResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
+import io.github.eonewg.gnome.core.model.toCore
 import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
@@ -34,18 +35,18 @@ class MemoDetailViewModel @Inject constructor(
     private val memoId: String? = savedStateHandle["memoId"]
 
     val uiState: StateFlow<MemoDetailUiState> = combine(
-        memoService.memos,
+        memoService.domainMemos,
         accountService.currentAccount,
     ) { memos, account ->
         MemoDetailUiState(
-            memo = memoId?.let { id -> memos.firstOrNull { it.identifier == id } },
+            memo = memoId?.let { id -> memos.firstOrNull { it.id == id } },
             isRemoteAccount = account !is Account.Local,
             host = when (account) {
                 is Account.MemosV0 -> account.info.host
                 is Account.MemosV1 -> account.info.host
                 else -> null
             },
-            defaultVisibility = account?.toUser()?.defaultVisibility,
+            defaultVisibility = account?.toUser()?.defaultVisibility?.toCore(),
         )
     }.stateIn(
         scope = viewModelScope,
@@ -80,6 +81,6 @@ class MemoDetailViewModel @Inject constructor(
     suspend fun cacheResourceFile(resourceId: String, uri: Uri): ApiResponse<Unit> =
         memoActions.cacheResource(resourceId, uri)
 
-    suspend fun downloadAndCacheResource(resource: ResourceEntity): Uri? =
+    suspend fun downloadAndCacheResource(resource: ResourceRepresentable): Uri? =
         memoActions.downloadAndCache(resource)
 }

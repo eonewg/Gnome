@@ -6,7 +6,7 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.MemoVisibility
 
 val MemoVisibility.icon: ImageVector get() = when (this) {
     MemoVisibility.PRIVATE -> Icons.Outlined.Lock

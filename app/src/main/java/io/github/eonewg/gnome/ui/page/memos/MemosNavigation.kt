@@ -12,7 +12,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
+import io.github.eonewg.gnome.feature.editor.EditorRoute
+import io.github.eonewg.gnome.feature.memo.MemoDetailRoute
 import io.github.eonewg.gnome.feature.search.SearchRoute
+import io.github.eonewg.gnome.feature.tag.TagMemoRoute
+import io.github.eonewg.gnome.feature.timeline.DateMemoRoute
 import io.github.eonewg.gnome.feature.timeline.TimelineRoute
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import java.time.LocalDate
@@ -55,7 +59,7 @@ fun MemosNavigation(
         composable(
             "${RouteName.TAG}/{tag}"
         ) { entry ->
-            TagMemoPage(
+            TagMemoRoute(
                 drawerState = drawerState,
                 tag = entry.arguments?.getString("tag")?.let(Uri::decode) ?: "",
                 navController = navController
@@ -68,7 +72,7 @@ fun MemosNavigation(
             val date = entry.arguments?.getString("date")
                 ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
                 ?: LocalDate.now()
-            DateMemoPage(
+            DateMemoRoute(
                 drawerState = drawerState,
                 date = date,
                 navController = navController,
@@ -96,6 +100,23 @@ fun MemosNavigation(
 
         composable(RouteName.SEARCH) {
             SearchRoute(navController = navController)
+        }
+
+        composable("${RouteName.MEMO_DETAIL}?memoId={memoId}") { entry ->
+            val memoId = entry.arguments?.getString("memoId")
+            if (memoId != null) {
+                MemoDetailRoute(
+                    memoIdentifier = Uri.decode(memoId),
+                    navController = navController,
+                )
+            }
+        }
+
+        composable("${RouteName.EDIT}?memoId={id}") { entry ->
+            EditorRoute(
+                memoIdentifier = entry.arguments?.getString("id"),
+                navController = navController,
+            )
         }
     }
 

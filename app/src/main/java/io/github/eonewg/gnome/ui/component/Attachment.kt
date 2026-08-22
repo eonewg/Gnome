@@ -30,7 +30,6 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.GnomeFileProvider
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.ext.string
 import timber.log.Timber
@@ -40,7 +39,7 @@ import java.io.File
 fun Attachment(
     resource: ResourceRepresentable,
     onRemove: (() -> Unit)? = null,
-    onDownloadAndCache: (suspend (ResourceEntity) -> Uri?)? = null,
+    onDownloadAndCache: (suspend (ResourceRepresentable) -> Uri?)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -142,7 +141,7 @@ fun Attachment(
 private suspend fun resolveAttachmentFile(
     context: Context,
     resource: ResourceRepresentable,
-    downloadAndCache: (suspend (ResourceEntity) -> Uri?)?,
+    downloadAndCache: (suspend (ResourceRepresentable) -> Uri?)?,
 ): File? {
     existingLocalFile(resource)?.let { return it }
 
@@ -151,8 +150,7 @@ private suspend fun resolveAttachmentFile(
         return null
     }
 
-    val resourceEntity = resource as? ResourceEntity ?: return null
-    val cachedUri = downloadAndCache?.invoke(resourceEntity) ?: return null
+    val cachedUri = downloadAndCache?.invoke(resource) ?: return null
     val canonical = cachedUri
         .takeIf { it.scheme == "file" }
         ?.path

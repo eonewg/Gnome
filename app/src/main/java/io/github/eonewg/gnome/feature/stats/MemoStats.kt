@@ -1,7 +1,6 @@
 package io.github.eonewg.gnome.feature.stats
 
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import java.time.Instant
 import java.time.LocalDate
 import java.time.Year
@@ -88,14 +87,12 @@ data class MemoStatsSnapshot(
 
 /**
  * The minimal memo projection the statistics need, so the same pure
- * calculation works over Room entities and domain memos alike.
+ * calculation works over any memo source.
  */
 data class MemoStatsInput(
     val date: Instant,
     val content: String,
 )
-
-fun MemoEntity.toStatsInput() = MemoStatsInput(date = date, content = content)
 
 fun Memo.toStatsInput() = MemoStatsInput(date = date, content = content)
 

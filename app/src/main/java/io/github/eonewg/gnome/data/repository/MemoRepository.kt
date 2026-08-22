@@ -34,6 +34,12 @@ interface MemoRepository {
 
     fun observeTimeline(): Flow<List<Memo>>
 
+    /** Live archived memos (deleted rows filtered out), newest first. */
+    fun observeArchived(): Flow<List<Memo>>
+
+    /** Live attachment list for the account, newest first. */
+    fun observeAttachments(): Flow<List<Attachment>>
+
     suspend fun getMemo(identifier: String): Memo?
 
     suspend fun getAttachment(identifier: String): Attachment?

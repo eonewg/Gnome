@@ -94,9 +94,9 @@
 - Partial：SyncingRepository / LocalDatabaseRepository 已随 Phase 5 删除；
   Phase 10 已建立 domain 契约 `interface MemoRepository`（core.model 出参），
   `MemoRepositoryImpl` 同时实现两者，旧 entity 接口仅作迁移 adapter。
-  剩余 entity 调用方：ArchivedMemoListViewModel、ExploreList、ResourceListPage——
-  随 Phase 17/18 页面迁移逐步收窄后移除（MemosViewModel / MemoDetailPage /
-  ArchivedMemoPage / UserStateViewModel 已随 Phase 16 迁走）。
+  剩余 entity 调用方已随 Phase 16.5 全部清空（ArchivedMemoListViewModel /
+  ExploreList / ResourceListPage 改走领域流与展示模型）；widget 仍经
+  `AbstractMemoRepository` 适配（Phase 18 处理）。
 
 ### Phase 10 — 拆分 AccountService
 - **Done**（4 commits：c03428ed / 4d54ed0e / 2a3d8e79 / 985db918 + b1a6d936 微调）
@@ -188,6 +188,27 @@
     （单 memo 写操作统一委托 MemoRepository）。
   - Login 组装迁入 AccountService；EditorRoute 以 navController 参数取代
     CompositionLocal；MainActivity/QuickMemoActivity 不再提供 VM。
+  - 验证：129 单测全绿，assembleDebug + assembleRelease 通过。
+
+### Phase 16.5 — Legacy Boundary Cleanup
+- **Done**（commit c450eb48）：
+  - 领域流补全：`MemoRepository` 新增 `observeArchived()` / `observeAttachments()`
+    （Room flow 投影 domain），Archived/Resource 列表改流驱动，删快照管理。
+  - MemoDetail 全链路 domain 化：UiState/ViewModel 不再接触 MemoEntity，
+    `downloadAndCacheResource` 签名从 `ResourceEntity` 改为 `ResourceRepresentable`
+    （`ResourceRepresentable` 增加 `identifier`，UI 中 `as? ResourceEntity` cast 全部消失）。
+  - 附件链组件（Attachment/MemoContent/MemoCardActions/MemoImage）零 entity 引用；
+    `MemoService.memos`（entity 流出口）删除，`MemoEntity.toStatsInput` 死代码删除。
+  - presentation 扩展 `icon`/`titleResource` 迁移到 `core.model.MemoVisibility`，
+    全部 UiState 的 `defaultVisibility` 改 core 类型，编辑器 visibility 全程 core。
+  - Explore 边界：新增 `feature/explore/ExploreMemo` 展示模型，ExploreViewModel
+    在 PagingData 上映射，UI 只消费展示模型，wire `data.model.Memo` 留在 data 层。
+  - SideDrawer/TagDrawerItem 去 NavController 改纯回调（selection 由 MemosPage
+    计算传入）；SearchScreen/StatsScreen/StatsDetailScreen/MemoDetailPage/
+    ResourceListPage 去 NavController，导航只存在于 Route；TagMemoPage/DateMemoPage
+    拆分并迁入 feature/tag、feature/timeline 的 Screen+Route 结构。
+  - 修复内层 NavHost 未注册 `MEMO_DETAIL`/`EDIT` 的路由接线（此前卡片点击在
+    navigation 2.9.7 下会因目标缺失抛 IllegalArgumentException）。
   - 验证：129 单测全绿，assembleDebug + assembleRelease 通过。
 
 ### Phase 17 — Navigation 重构

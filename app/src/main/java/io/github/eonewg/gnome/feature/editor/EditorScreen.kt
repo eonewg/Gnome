@@ -30,8 +30,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.GnomeFileProvider
 import io.github.eonewg.gnome.core.model.MemoVisibility
-import io.github.eonewg.gnome.core.model.toCore
-import io.github.eonewg.gnome.core.model.toData
 import io.github.eonewg.gnome.ui.page.memoinput.MemoInputBottomBar
 import io.github.eonewg.gnome.ui.page.memoinput.MemoInputEditor
 import io.github.eonewg.gnome.ui.page.memoinput.MemoInputTopBar
@@ -164,10 +162,10 @@ fun EditorScreen(
     val bottomBar: @Composable (submit: (() -> Unit)?) -> Unit = { submit ->
         MemoInputBottomBar(
             isLocalAccount = uiState.isLocalAccount,
-            currentVisibility = uiState.visibility.toData(),
+            currentVisibility = uiState.visibility,
             visibilityMenuExpanded = visibilityMenuExpanded,
             onVisibilityExpandedChange = { visibilityMenuExpanded = it },
-            onVisibilitySelected = { onVisibilitySelected(it.toCore()) },
+            onVisibilitySelected = { onVisibilitySelected(it) },
             onHashTagClick = {
                 onUpdateText { replaceSelection(it, "#") }
                 focusRequester.requestFocus()

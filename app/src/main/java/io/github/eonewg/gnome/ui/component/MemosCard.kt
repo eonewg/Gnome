@@ -58,9 +58,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.core.model.SyncState
 import io.github.eonewg.gnome.data.model.MemoEditGesture
-import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.ext.icon
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
@@ -152,10 +152,10 @@ fun MemosCard(
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
-                if (defaultVisibility != representable.visibility) {
+                if (defaultVisibility != memo.visibility) {
                     Icon(
-                        representable.visibility.icon,
-                        contentDescription = stringResource(representable.visibility.titleResource),
+                        memo.visibility.icon,
+                        contentDescription = stringResource(memo.visibility.titleResource),
                         modifier = Modifier
                             .padding(start = 5.dp)
                             .size(18.dp),

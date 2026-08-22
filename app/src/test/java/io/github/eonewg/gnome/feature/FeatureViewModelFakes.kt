@@ -26,6 +26,7 @@ import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.sync.SyncScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import okhttp3.OkHttpClient
 import java.time.Instant
 
@@ -131,6 +132,11 @@ internal class FakeMemoRepository : MemoRepository {
     val createCalls = mutableListOf<CreateCall>()
     val updateCalls = mutableListOf<UpdateCall>()
     val deletedIds = mutableListOf<String>()
+
+    override fun observeArchived(): Flow<List<Memo>> =
+        flowOf(memosById.values.filter { it.archived }.toList())
+
+    override fun observeAttachments(): Flow<List<Attachment>> = flowOf(emptyList())
 
     var failWrites = false
     var tagsResult: ApiResponse<List<String>> = ApiResponse.Success(emptyList())

@@ -1,26 +1,29 @@
-package io.github.eonewg.gnome.feature.search
+package io.github.eonewg.gnome.feature.timeline
 
 import android.net.Uri
+import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
+import java.time.LocalDate
 
-/** Registers the search feature: ViewModel → UiState → Screen wiring. */
+/** Registers the per-date memo list: ViewModel → UiState → Screen wiring. */
 @Composable
-fun SearchRoute(navController: NavHostController) {
-    val searchViewModel: SearchViewModel = hiltViewModel()
-    val uiState by searchViewModel.uiState.collectAsStateWithLifecycle()
+fun DateMemoRoute(
+    drawerState: DrawerState? = null,
+    date: LocalDate,
+    navController: NavHostController,
+) {
+    val dateMemoViewModel: DateMemoViewModel = hiltViewModel()
+    val uiState by dateMemoViewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     val memoCardActions = MemoCardActions(
         onOpen = { memo ->
@@ -30,30 +33,29 @@ fun SearchRoute(navController: NavHostController) {
             navController.navigate("${RouteName.EDIT}?memoId=$memoId")
         },
         onTogglePin = { memoId, pinned ->
-            scope.launch { searchViewModel.updateMemoPinned(memoId, pinned) }
+            scope.launch { dateMemoViewModel.updateMemoPinned(memoId, pinned) }
         },
         onArchive = { memoId ->
-            scope.launch { searchViewModel.archiveMemo(memoId) }
+            scope.launch { dateMemoViewModel.archiveMemo(memoId) }
         },
         onDelete = { memoId ->
-            scope.launch { searchViewModel.deleteMemo(memoId) }
+            scope.launch { dateMemoViewModel.deleteMemo(memoId) }
         },
         onUpdateContent = { memoId, content ->
-            scope.launch { searchViewModel.updateMemoContent(memoId, content) }
+            scope.launch { dateMemoViewModel.updateMemoContent(memoId, content) }
         },
         onCacheResource = { resourceId, uri ->
-            scope.launch { searchViewModel.cacheResourceFile(resourceId, uri) }
+            scope.launch { dateMemoViewModel.cacheResourceFile(resourceId, uri) }
         },
         onDownloadAndCache = { resource ->
-            searchViewModel.downloadAndCacheResource(resource)
+            dateMemoViewModel.downloadAndCacheResource(resource)
         },
     )
 
-    SearchScreen(
+    DateMemoScreen(
+        date = date,
+        drawerState = drawerState,
         uiState = uiState,
-        onQueryChange = searchViewModel::setQuery,
-        onIncludeArchivedChange = searchViewModel::setIncludeArchived,
-        onBack = { navController.popBackStackIfLifecycleIsResumed(lifecycleOwner) },
         onTagClick = { tag ->
             navController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
                 launchSingleTop = true

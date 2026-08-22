@@ -55,6 +55,12 @@ class LocalMemoDataSource(
     fun observeTimeline(accountKey: String): Flow<List<MemoWithResources>> =
         memoDao.observeAllMemos(accountKey)
 
+    fun observeArchived(accountKey: String): Flow<List<MemoWithResources>> =
+        memoDao.observeArchivedMemos(accountKey)
+
+    fun observeResources(accountKey: String): Flow<List<ResourceEntity>> =
+        memoDao.observeAllResources(accountKey)
+
     fun observeUnsyncedCount(accountKey: String): Flow<Int> =
         memoDao.observeUnsyncedCount(accountKey)
 

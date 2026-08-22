@@ -9,4 +9,7 @@ data class Resource(
     override val mimeType: String? = null,
     override val uri: String,
     override val localUri: String? = null,
-) : ResourceRepresentable
+) : ResourceRepresentable {
+    /** Wire resources have no local row yet; the remote id stands in. */
+    override val identifier: String get() = remoteId
+}

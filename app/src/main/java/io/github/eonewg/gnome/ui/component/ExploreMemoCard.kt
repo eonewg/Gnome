@@ -13,11 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import io.github.eonewg.gnome.data.model.Memo
+import io.github.eonewg.gnome.feature.explore.ExploreMemo
 
 @Composable
 fun ExploreMemoCard(
-    memo: Memo
+    memo: ExploreMemo
 ) {
     Card(
         modifier = Modifier
@@ -37,9 +37,9 @@ fun ExploreMemoCard(
                     color = MaterialTheme.colorScheme.outline
                 )
 
-                if (memo.creator != null && !TextUtils.isEmpty(memo.creator.name)) {
+                if (!TextUtils.isEmpty(memo.creatorName)) {
                     Text(
-                        "@${memo.creator.name}",
+                        "@${memo.creatorName}",
                         modifier = Modifier.padding(start = 10.dp),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.outline

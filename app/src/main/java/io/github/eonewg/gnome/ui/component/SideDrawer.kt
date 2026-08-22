@@ -21,7 +21,6 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,57 +28,45 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.currentBackStackEntryAsState
-import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.feature.drawer.DrawerUiState
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import java.net.URLEncoder
 import java.time.LocalDate
 
+/**
+ * The navigation drawer. Navigation itself happens at the hosting page: the
+ * drawer only reports which destination is selected ([selectedRoute],
+ * [selectedTag]) and forwards pure click callbacks.
+ */
 @Composable
 fun SideDrawer(
-    memosNavController: NavHostController,
-    drawerState: DrawerState? = null,
     uiState: DrawerUiState = DrawerUiState(),
-    rootNavController: NavHostController,
+    selectedRoute: String? = null,
+    selectedTag: String? = null,
+    onStatsClick: () -> Unit = {},
+    onMemosClick: () -> Unit = {},
+    onExploreClick: () -> Unit = {},
+    onResourcesClick: () -> Unit = {},
+    onArchivedClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
+    onTagClick: (String) -> Unit = {},
+    onDateClick: (LocalDate) -> Unit = {},
 ) {
-    val scope = rememberCoroutineScope()
-    val navBackStackEntry by memosNavController.currentBackStackEntryAsState()
-    val currentDestination = navBackStackEntry?.destination
     val colors = GnomeDesign.colors
     val displayName = uiState.displayName.ifBlank { R.string.gnome.string }
 
     fun isSelected(route: String): Boolean {
-        return currentDestination?.hierarchy?.any { it.route == route } == true
+        return selectedRoute == route
     }
 
     fun isTagSelected(tag: String): Boolean {
-        if (!isSelected("${RouteName.TAG}/{tag}")) return false
-
-        val currentTag = navBackStackEntry?.arguments?.getString("tag")
-        val encodedTag = URLEncoder.encode(tag, "UTF-8")
-        return currentTag == tag || currentTag == encodedTag
-    }
-
-    fun navigateToDate(date: LocalDate) {
-        scope.launch {
-            memosNavController.navigate("${RouteName.DATE}/$date") {
-                launchSingleTop = true
-                restoreState = true
-            }
-            drawerState?.close()
-        }
+        return selectedRoute == "${RouteName.TAG}/{tag}" && selectedTag == tag
     }
 
     LazyColumn(
@@ -108,14 +95,7 @@ fun SideDrawer(
                 tagCount = uiState.tags.size,
                 days = uiState.days,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                onClick = {
-                    scope.launch {
-                        drawerState?.close()
-                        rootNavController.navigate(RouteName.STATS) {
-                            launchSingleTop = true
-                        }
-                    }
-                },
+                onClick = onStatsClick,
             )
         }
 
@@ -126,7 +106,7 @@ fun SideDrawer(
                     .fillMaxWidth()
                     .height(126.dp)
                     .padding(start = 18.dp, top = 10.dp, end = 18.dp, bottom = 10.dp),
-                onDateClick = ::navigateToDate,
+                onDateClick = onDateClick,
             )
         }
 
@@ -137,15 +117,7 @@ fun SideDrawer(
                 label = R.string.memos.string,
                 icon = Icons.Outlined.GridView,
                 selected = isSelected(RouteName.MEMOS),
-                onClick = {
-                    scope.launch {
-                        memosNavController.navigate(RouteName.MEMOS) {
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                        drawerState?.close()
-                    }
-                },
+                onClick = onMemosClick,
             )
         }
 
@@ -155,15 +127,7 @@ fun SideDrawer(
                     label = R.string.explore.string,
                     icon = Icons.Outlined.Home,
                     selected = isSelected(RouteName.EXPLORE),
-                    onClick = {
-                        scope.launch {
-                            memosNavController.navigate(RouteName.EXPLORE) {
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                            drawerState?.close()
-                        }
-                    },
+                    onClick = onExploreClick,
                 )
             }
         }
@@ -173,12 +137,7 @@ fun SideDrawer(
                 label = R.string.resources.string,
                 icon = Icons.Outlined.PhotoLibrary,
                 selected = false,
-                onClick = {
-                    scope.launch {
-                        drawerState?.close()
-                        rootNavController.navigate(RouteName.RESOURCE)
-                    }
-                },
+                onClick = onResourcesClick,
             )
         }
 
@@ -187,15 +146,7 @@ fun SideDrawer(
                 label = R.string.archived.string,
                 icon = Icons.Outlined.Inventory2,
                 selected = isSelected(RouteName.ARCHIVED),
-                onClick = {
-                    scope.launch {
-                        memosNavController.navigate(RouteName.ARCHIVED) {
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                        drawerState?.close()
-                    }
-                },
+                onClick = onArchivedClick,
             )
         }
 
@@ -204,12 +155,7 @@ fun SideDrawer(
                 label = R.string.settings.string,
                 icon = Icons.Outlined.Settings,
                 selected = false,
-                onClick = {
-                    scope.launch {
-                        drawerState?.close()
-                        rootNavController.navigate(RouteName.SETTINGS)
-                    }
-                },
+                onClick = onSettingsClick,
             )
         }
 
@@ -234,8 +180,7 @@ fun SideDrawer(
             TagDrawerItem(
                 tag = tag,
                 selected = isTagSelected(tag),
-                memosNavController = memosNavController,
-                drawerState = drawerState,
+                onClick = { onTagClick(tag) },
             )
         }
     }

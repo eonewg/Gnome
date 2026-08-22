@@ -116,6 +116,14 @@ class MemoRepositoryImpl(
         return localData.observeTimeline(accountKeyValue).map { rows -> rows.map { it.toDomain() } }
     }
 
+    override fun observeArchived(): Flow<List<Memo>> {
+        return localData.observeArchived(accountKeyValue).map { rows -> rows.map { it.toDomain() } }
+    }
+
+    override fun observeAttachments(): Flow<List<Attachment>> {
+        return localData.observeResources(accountKeyValue).map { rows -> rows.map { it.toDomain() } }
+    }
+
     // -----------------------------------------------------------------------
     // Domain contract (core.model types; entity adapter below)
     // -----------------------------------------------------------------------

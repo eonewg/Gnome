@@ -6,8 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.skydoves.sandwich.ApiResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
+import io.github.eonewg.gnome.core.model.toCore
 import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
@@ -90,7 +91,7 @@ class SearchViewModel @Inject constructor(
     suspend fun cacheResourceFile(resourceId: String, uri: Uri): ApiResponse<Unit> =
         memoActions.cacheResource(resourceId, uri)
 
-    suspend fun downloadAndCacheResource(resource: ResourceEntity): Uri? =
+    suspend fun downloadAndCacheResource(resource: ResourceRepresentable): Uri? =
         memoActions.downloadAndCache(resource)
 
     private fun SearchUiState.withAccount(account: Account?): SearchUiState = copy(
@@ -100,6 +101,6 @@ class SearchViewModel @Inject constructor(
             is Account.MemosV1 -> account.info.host
             else -> null
         },
-        defaultVisibility = account?.toUser()?.defaultVisibility,
+        defaultVisibility = account?.toUser()?.defaultVisibility?.toCore(),
     )
 }

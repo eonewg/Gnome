@@ -88,7 +88,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Attachment as DomainAttachment
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.ext.icon
 import io.github.eonewg.gnome.ext.string

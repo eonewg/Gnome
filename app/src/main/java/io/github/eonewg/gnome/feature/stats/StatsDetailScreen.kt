@@ -42,10 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.time.LocalDate
 import java.time.Month
@@ -59,9 +56,8 @@ import java.util.Locale
 @Composable
 fun StatsDetailScreen(
     uiState: StatsUiState,
-    navController: NavHostController,
+    onBack: () -> Unit,
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
     val colors = GnomeDesign.colors
     val zoneId = remember { ZoneId.systemDefault() }
     val currentMonth = remember(zoneId) { YearMonth.now(zoneId) }
@@ -97,9 +93,7 @@ fun StatsDetailScreen(
                 title = { Text(stringResource(R.string.stats_record_statistics)) },
                 navigationIcon = {
                     IconButton(
-                        onClick = {
-                            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
-                        },
+                        onClick = onBack,
                     ) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,

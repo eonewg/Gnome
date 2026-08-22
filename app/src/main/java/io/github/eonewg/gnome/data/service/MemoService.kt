@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.repository.MemoRepository
@@ -35,10 +34,6 @@ open class MemoService @Inject constructor(
 
     open val syncStatus: Flow<SyncStatus> = accountService.currentAccount.flatMapLatest {
         accountService.getRepository().syncStatus
-    }
-
-    val memos: Flow<List<MemoEntity>> = accountService.currentAccount.flatMapLatest {
-        accountService.getRepository().observeMemos()
     }
 
     /** Timeline as domain models — the read path new UI code uses. */

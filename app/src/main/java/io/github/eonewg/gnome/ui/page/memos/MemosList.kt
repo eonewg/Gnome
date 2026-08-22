@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.data.model.MemoEditGesture
 import io.github.eonewg.gnome.data.model.Settings

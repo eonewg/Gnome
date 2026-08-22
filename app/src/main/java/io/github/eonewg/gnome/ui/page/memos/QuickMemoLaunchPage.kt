@@ -147,7 +147,7 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
                             items = memos
                                 .sortedByDescending { it.pinned }
                                 .take(6),
-                            key = { it.identifier },
+                            key = { it.id },
                         ) { memo ->
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),

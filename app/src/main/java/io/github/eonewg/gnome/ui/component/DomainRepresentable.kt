@@ -23,6 +23,7 @@ fun Memo.toRepresentable(): MemoRepresentable = object : MemoRepresentable {
 }
 
 fun Attachment.toResourceRepresentable(): ResourceRepresentable = object : ResourceRepresentable {
+    override val identifier: String = this@toResourceRepresentable.id
     override val remoteId: String? = this@toResourceRepresentable.remoteId
     override val date: java.time.Instant = this@toResourceRepresentable.date
     override val filename: String = this@toResourceRepresentable.filename
