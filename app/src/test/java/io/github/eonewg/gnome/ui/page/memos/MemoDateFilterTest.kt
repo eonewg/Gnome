@@ -2,6 +2,7 @@ package io.github.eonewg.gnome.ui.page.memos
 
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.MemoVisibility
+import io.github.eonewg.gnome.feature.timeline.memoMatchesDate
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test

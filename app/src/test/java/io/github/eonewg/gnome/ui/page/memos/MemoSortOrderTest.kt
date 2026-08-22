@@ -2,6 +2,8 @@ package io.github.eonewg.gnome.ui.page.memos
 
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.MemoVisibility
+import io.github.eonewg.gnome.feature.timeline.MemoSortOrder
+import io.github.eonewg.gnome.feature.timeline.orderMemosForTimeline
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant

@@ -40,6 +40,9 @@ import io.github.eonewg.gnome.data.model.MemoEditGesture
 import io.github.eonewg.gnome.data.model.Settings
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.feature.timeline.MemoSortOrder
+import io.github.eonewg.gnome.feature.timeline.memoMatchesDate
+import io.github.eonewg.gnome.feature.timeline.orderMemosForTimeline
 import io.github.eonewg.gnome.ui.component.MemosCard
 import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
 import io.github.eonewg.gnome.ui.util.edgeToEdgeContentPadding
@@ -50,29 +53,6 @@ import io.github.eonewg.gnome.viewmodel.ManualSyncResult
 import timber.log.Timber
 import java.time.LocalDate
 import java.time.OffsetDateTime
-import java.time.ZoneOffset
-
-enum class MemoSortOrder {
-    CreatedNewest,
-    CreatedOldest,
-    UpdatedNewest,
-    UpdatedOldest,
-}
-
-internal fun orderMemosForTimeline(
-    memos: List<Memo>,
-    sortOrder: MemoSortOrder,
-): List<Memo> {
-    val comparator = when (sortOrder) {
-        MemoSortOrder.CreatedNewest -> compareByDescending<Memo> { it.date }
-        MemoSortOrder.CreatedOldest -> compareBy<Memo> { it.date }
-        MemoSortOrder.UpdatedNewest -> compareByDescending<Memo> { it.lastModified }
-        MemoSortOrder.UpdatedOldest -> compareBy<Memo> { it.lastModified }
-    }
-    val pinned = memos.filter { it.pinned }.sortedWith(comparator)
-    val nonPinned = memos.filter { !it.pinned }.sortedWith(comparator)
-    return pinned + nonPinned
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -292,12 +272,6 @@ fun MemosList(
         }
     }
 }
-
-internal fun memoMatchesDate(
-    memo: Memo,
-    date: LocalDate,
-    offset: ZoneOffset,
-): Boolean = memo.date.atOffset(offset).toLocalDate() == date
 
 private sealed class PullRefreshSyncAlert {
     data class Blocked(val message: String) : PullRefreshSyncAlert()
