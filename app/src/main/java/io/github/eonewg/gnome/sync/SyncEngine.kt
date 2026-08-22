@@ -1,12 +1,10 @@
 package io.github.eonewg.gnome.sync
 
-import android.net.Uri
-import androidx.core.net.toUri
 import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.getOrNull
 import io.github.eonewg.gnome.data.constant.GnomeException
-import io.github.eonewg.gnome.data.local.dao.MemoDao
-import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
+import io.github.eonewg.gnome.data.local.LocalMemoDataSource
+import io.github.eonewg.gnome.data.local.fileUriToPath
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.local.entity.SyncEntityType
@@ -23,36 +21,23 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 
-/** Subset of FileStorage needed by the engine; keeps the engine JVM-unit-testable. */
-fun interface SyncFileStore {
-    fun deleteFile(uri: Uri)
-}
-
-/** Runs multi-row writes atomically; production wires this to Room withTransaction. */
-interface TransactionRunner {
-    suspend fun <R> inTransaction(block: suspend () -> R): R
-}
-
-private object PassthroughTransactionRunner : TransactionRunner {
-    override suspend fun <R> inTransaction(block: suspend () -> R): R = block()
-}
-
 /**
  * The single synchronization algorithm. Owns no UI state and must only be invoked
- * through the per-account serialization its callers provide (SyncingRepository's
+ * through the per-account serialization its callers provide (the repository's
  * mutex covers both manual syncs and SyncWorker runs in this process).
  *
- * Phase-1 strategy (kept from the original implementation, intentionally simple):
+ * Reaches Room exclusively through [LocalMemoDataSource] and the server
+ * exclusively through [RemoteRepository].
+ *
+ * Strategy (kept from the original implementation, intentionally simple):
  * pull the full server snapshot, reconcile it against Room row-by-row using
  * [ConflictResolver], push local pending rows, then drain the durable outbox.
  */
 class SyncEngine(
-    private val memoDao: MemoDao,
-    private val syncOperationDao: SyncOperationDao,
+    private val localData: LocalMemoDataSource,
     private val fileStore: SyncFileStore,
     private val remoteRepository: RemoteRepository,
     private val account: Account,
-    private val transactionRunner: TransactionRunner = PassthroughTransactionRunner,
     private val onUserSynced: suspend (User) -> Unit = {},
 ) {
     private data class UploadedResourcesResult(
@@ -97,7 +82,7 @@ class SyncEngine(
             }
         }
 
-        val localMemos = memoDao.getAllMemosForSync(accountKey)
+        val localMemos = localData.getAllForSync(accountKey)
         val localByRemoteId = localMemos.mapNotNull { memo ->
             memo.remoteId?.let { it to memo }
         }.toMap()
@@ -105,7 +90,7 @@ class SyncEngine(
         for (remoteMemo in remoteMemos) {
             val remoteId = remoteMemoId(remoteMemo)
             val local = localByRemoteId[remoteId]
-            val localResources = local?.let { memoDao.getMemoResources(it.identifier, accountKey) }
+            val localResources = local?.let { localData.getMemoResources(it.identifier, accountKey) }
             val equivalent = local != null && ConflictResolver.memoEquivalent(local, remoteMemo, localResources.orEmpty())
             val remoteChanged = local != null && ConflictResolver.hasRemoteChanged(local.lastSyncedAt, remoteMemo)
 
@@ -135,7 +120,7 @@ class SyncEngine(
             }
         }
 
-        val latestLocals = memoDao.getAllMemosForSync(accountKey)
+        val latestLocals = localData.getAllForSync(accountKey)
         for (local in latestLocals) {
             if (local.remoteId != null) {
                 if (local.remoteId in knownRemoteIds) {
@@ -188,7 +173,7 @@ class SyncEngine(
         var firstError: String? = null
 
         while (true) {
-            val operations = syncOperationDao.getOperations(accountKey)
+            val operations = localData.operations(accountKey)
             if (operations.isEmpty()) break
 
             var deletedThisRound = 0
@@ -199,11 +184,11 @@ class SyncEngine(
                     e.message ?: e.javaClass.simpleName
                 }
                 if (opError == null) {
-                    syncOperationDao.delete(operation.id)
+                    localData.deleteOperation(operation.id)
                     deletedThisRound += 1
                 } else {
                     firstError = firstError ?: opError
-                    syncOperationDao.enqueue(operation.copy(
+                    localData.requeueOperation(operation.copy(
                         attemptCount = operation.attemptCount + 1,
                         lastAttemptAt = Instant.now(),
                         lastError = opError,
@@ -224,7 +209,7 @@ class SyncEngine(
     }
 
     private suspend fun processMemoOperation(operation: SyncOperationEntity): String? {
-        val memo = memoDao.getMemoById(operation.entityId, accountKey) ?: return null
+        val memo = localData.getMemo(operation.entityId, accountKey) ?: return null
         return when (operation.operation) {
             SyncOperationType.UPSERT -> {
                 if (!memo.needsSync && !memo.isDeleted) return null
@@ -240,7 +225,7 @@ class SyncEngine(
     private suspend fun processAttachmentOperation(operation: SyncOperationEntity): String? {
         return when (operation.operation) {
             SyncOperationType.UPSERT -> {
-                val resource = memoDao.getResourceById(operation.entityId, accountKey) ?: return null
+                val resource = localData.getResource(operation.entityId, accountKey) ?: return null
                 if (resource.remoteId != null) return null
                 if (pushLocalResource(resource.identifier)) null else operationFailed()
             }
@@ -289,13 +274,9 @@ class SyncEngine(
         }
     }
 
-    private suspend fun pushLocalMemo(
-        identifier: String,
-        forceCreate: Boolean = false,
-        knownRemoteIds: MutableSet<String>? = null,
-    ): Boolean {
+    private suspend fun pushLocalMemo(identifier: String, forceCreate: Boolean = false, knownRemoteIds: MutableSet<String>? = null): Boolean {
         pendingDetailedSyncError = null
-        val local = memoDao.getMemoById(identifier, accountKey) ?: return true
+        val local = localData.getMemo(identifier, accountKey) ?: return true
 
         if (local.isDeleted) {
             return if (local.remoteId != null) {
@@ -332,7 +313,7 @@ class SyncEngine(
                 applyRemoteMemo(
                     updated.data.copy(archived = local.archived),
                     preferredLocalIdentifier = local.identifier,
-                    knownRemoteIds = knownRemoteIds
+                    knownRemoteIds = knownRemoteIds,
                 )
                 true
             } else {
@@ -355,17 +336,13 @@ class SyncEngine(
             applyRemoteMemo(
                 created.data.copy(remoteId = createdRemoteId),
                 preferredLocalIdentifier = local.identifier,
-                knownRemoteIds = knownRemoteIds
+                knownRemoteIds = knownRemoteIds,
             )
             true
         }
     }
 
-    private suspend fun duplicateConflict(
-        local: MemoEntity,
-        remoteMemo: Memo,
-        knownRemoteIds: MutableSet<String>,
-    ): Boolean {
+    private suspend fun duplicateConflict(local: MemoEntity, remoteMemo: Memo, knownRemoteIds: MutableSet<String>): Boolean {
         val duplicateLocal = local.copy(
             identifier = UUID.randomUUID().toString(),
             remoteId = null,
@@ -375,24 +352,14 @@ class SyncEngine(
             lastModified = Instant.now()
         )
 
-        transactionRunner.inTransaction {
-            memoDao.insertMemo(duplicateLocal)
-            memoDao.getMemoResources(local.identifier, accountKey).forEach { resource ->
-                memoDao.insertResource(
-                    resource.copy(
-                        identifier = UUID.randomUUID().toString(),
-                        memoId = duplicateLocal.identifier
-                    )
-                )
-            }
-        }
+        localData.insertMemoWithClonedResources(accountKey, local.identifier, duplicateLocal)
 
         applyRemoteMemo(remoteMemo, local.identifier, knownRemoteIds)
         return pushLocalMemo(duplicateLocal.identifier, forceCreate = true, knownRemoteIds = knownRemoteIds)
     }
 
     private suspend fun ensureUploadedResources(localMemo: MemoEntity): UploadedResourcesResult {
-        val resources = memoDao.getMemoResources(localMemo.identifier, accountKey)
+        val resources = localData.getMemoResources(localMemo.identifier, accountKey)
         val uploaded = arrayListOf<String>()
         var failedUploads = 0
 
@@ -410,18 +377,14 @@ class SyncEngine(
 
     private suspend fun ensureUploadedResource(
         resource: ResourceEntity,
-        memoRemoteId: String?
+        memoRemoteId: String?,
     ): ResourceEntity? {
         if (resource.remoteId != null) {
             return resource
         }
 
-        val uri = (resource.localUri ?: resource.uri).toUri()
-        if (uri.scheme != "file") {
-            return null
-        }
-
-        val path = uri.path ?: return null
+        val uriString = resource.localUri ?: resource.uri
+        val path = fileUriToPath(uriString) ?: return null
         val file = File(path)
         if (!file.exists()) {
             return null
@@ -441,7 +404,7 @@ class SyncEngine(
             uri = remoteResource.uri,
             localUri = resource.localUri ?: resource.uri
         )
-        memoDao.insertResource(synced)
+        localData.upsertResource(synced)
         return synced
     }
 
@@ -452,74 +415,46 @@ class SyncEngine(
     ) {
         val remoteId = remoteMemoId(remoteMemo)
         knownRemoteIds?.add(remoteId)
-        val current = memoDao.getMemoByRemoteId(remoteId, accountKey)
-            ?: preferredLocalIdentifier?.let { memoDao.getMemoById(it, accountKey) }
+        val current = localData.getMemoByRemoteId(remoteId, accountKey)
+            ?: preferredLocalIdentifier?.let { localData.getMemo(it, accountKey) }
 
         val localIdentifier = current?.identifier ?: UUID.randomUUID().toString()
         val remoteUpdatedAt = remoteMemo.updatedAt ?: remoteMemo.date
 
-        // File deletions run after the transaction: Room transactions must stay
-        // free of file IO. A crash in between only leaves an orphan file.
-        val staleLocalFiles = arrayListOf<Uri>()
-
-        transactionRunner.inTransaction {
-            memoDao.insertMemo(
-                MemoEntity(
-                    identifier = localIdentifier,
-                    remoteId = remoteId,
-                    accountKey = accountKey,
-                    content = remoteMemo.content,
-                    date = remoteMemo.date,
-                    visibility = remoteMemo.visibility,
-                    pinned = remoteMemo.pinned,
-                    archived = remoteMemo.archived,
-                    needsSync = false,
-                    isDeleted = false,
-                    lastModified = remoteUpdatedAt,
-                    lastSyncedAt = remoteUpdatedAt
-                )
+        val entity = MemoEntity(
+            identifier = localIdentifier,
+            remoteId = remoteId,
+            accountKey = accountKey,
+            content = remoteMemo.content,
+            date = remoteMemo.date,
+            visibility = remoteMemo.visibility,
+            pinned = remoteMemo.pinned,
+            archived = remoteMemo.archived,
+            needsSync = false,
+            isDeleted = false,
+            lastModified = remoteUpdatedAt,
+            lastSyncedAt = remoteUpdatedAt
+        )
+        val remoteResources = remoteMemo.resources.map { resource ->
+            ResourceEntity(
+                identifier = remoteResourceId(resource),
+                remoteId = remoteResourceId(resource),
+                accountKey = accountKey,
+                date = resource.date,
+                filename = resource.filename,
+                uri = resource.uri,
+                localUri = null,
+                mimeType = resource.mimeType,
+                memoId = localIdentifier
             )
-
-            val currentResources = memoDao.getMemoResources(localIdentifier, accountKey)
-            val remoteResourceIds = remoteMemo.resources.mapTo(hashSetOf()) { remoteResourceId(it) }
-            currentResources.forEach { currentResource ->
-                if (currentResource.remoteId !in remoteResourceIds) {
-                    localFileUriOf(currentResource)?.let(staleLocalFiles::add)
-                    memoDao.deleteResource(currentResource)
-                }
-            }
-
-            remoteMemo.resources.forEach { resource ->
-                val remoteResourceId = remoteResourceId(resource)
-                val existing = currentResources.firstOrNull { it.remoteId == remoteResourceId }
-                val localResourceIdentifier = existing?.identifier ?: UUID.randomUUID().toString()
-                val preferredLocalUri = when {
-                    existing?.localUri != null && File(existing.localUri.toUri().path ?: "").exists() -> existing.localUri
-                    existing != null && existing.uri.toUri().scheme == "file" &&
-                        File(existing.uri.toUri().path ?: "").exists() -> existing.uri
-                    else -> null
-                }
-                memoDao.insertResource(
-                    ResourceEntity(
-                        identifier = localResourceIdentifier,
-                        remoteId = remoteResourceId,
-                        accountKey = accountKey,
-                        date = resource.date,
-                        filename = resource.filename,
-                        uri = resource.uri,
-                        localUri = preferredLocalUri,
-                        mimeType = resource.mimeType,
-                        memoId = localIdentifier
-                    )
-                )
-            }
         }
 
-        staleLocalFiles.forEach(fileStore::deleteFile)
+        val staleFiles = localData.replaceSyncedMemo(entity, remoteResources)
+        staleFiles.forEach(fileStore::deleteFile)
     }
 
     private suspend fun markSynced(local: MemoEntity, remoteMemo: Memo) {
-        memoDao.insertMemo(
+        localData.upsertMemo(
             local.copy(
                 remoteId = remoteMemoId(remoteMemo),
                 date = remoteMemo.date,
@@ -533,7 +468,7 @@ class SyncEngine(
 
     private suspend fun pushLocalResource(identifier: String): Boolean {
         pendingDetailedSyncError = null
-        val local = memoDao.getResourceById(identifier, accountKey) ?: return true
+        val local = localData.getResource(identifier, accountKey) ?: return true
         val ensured = ensureUploadedResource(local, memoRemoteId = null)
             ?: run {
                 pendingDetailedSyncError = ATTACHMENT_UPLOAD_FAILED_MESSAGE
@@ -543,21 +478,15 @@ class SyncEngine(
     }
 
     private suspend fun permanentlyDeleteMemo(identifier: String) {
-        memoDao.getMemoById(identifier, accountKey)?.let { memo ->
-            memoDao.getMemoResources(identifier, accountKey).forEach { resource ->
-                deleteLocalFile(resource)
-            }
-            memoDao.deleteMemo(memo)
-        }
-    }
-
-    private fun localFileUriOf(resource: ResourceEntity): Uri? {
-        return resource.localUri?.toUri()
-            ?: resource.uri.toUri().takeIf { it.scheme == "file" }
+        val removedResources = localData.purgeMemo(identifier, accountKey)
+        removedResources.forEach(::deleteLocalFile)
     }
 
     private fun deleteLocalFile(resource: ResourceEntity) {
-        localFileUriOf(resource)?.let(fileStore::deleteFile)
+        val uri = resource.localUri ?: resource.uri.takeIf { it.startsWith("file:") }
+        if (uri != null) {
+            fileStore.deleteFile(uri)
+        }
     }
 
     private fun remoteMemoId(memo: Memo): String {

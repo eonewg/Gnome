@@ -2,6 +2,8 @@ package io.github.eonewg.gnome.sync
 
 import com.skydoves.sandwich.ApiResponse
 import io.github.eonewg.gnome.data.constant.GnomeException
+import io.github.eonewg.gnome.data.local.LocalMemoDataSource
+import io.github.eonewg.gnome.data.local.TransactionRunner
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
@@ -29,6 +31,11 @@ import java.io.InputStream
 import java.time.Instant
 import java.util.UUID
 
+internal fun passthroughRunner(): TransactionRunner =
+    object : TransactionRunner {
+        override suspend fun <R> inTransaction(block: suspend () -> R): R = block()
+    }
+
 /**
  * JVM tests for the reconcile algorithm using in-memory fakes. Covers the core
  * offline-write lifecycles the refactor must not regress: create/edit/delete
@@ -46,14 +53,10 @@ class SyncEngineTest {
     private var syncedUser: User? = null
 
     private val engine = SyncEngine(
-        memoDao = memoDao,
-        syncOperationDao = operationDao,
+        localData = LocalMemoDataSource(memoDao, operationDao, passthroughRunner()),
         fileStore = SyncFileStore { },
         remoteRepository = remote,
         account = Account.Local(),
-        transactionRunner = object : TransactionRunner {
-            override suspend fun <R> inTransaction(block: suspend () -> R): R = block()
-        },
         onUserSynced = { syncedUser = it },
     )
 

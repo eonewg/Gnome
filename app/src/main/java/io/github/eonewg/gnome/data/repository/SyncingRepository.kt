@@ -2,19 +2,13 @@ package io.github.eonewg.gnome.data.repository
 
 import android.net.Uri
 import androidx.core.net.toUri
-import androidx.room.withTransaction
 import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.getOrNull
 import io.github.eonewg.gnome.data.local.FileStorage
-import io.github.eonewg.gnome.data.local.GnomeDatabase
-import io.github.eonewg.gnome.data.local.dao.MemoDao
-import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
+import io.github.eonewg.gnome.data.local.LocalMemoDataSource
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.local.entity.MemoWithResources
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
-import io.github.eonewg.gnome.data.local.entity.SyncEntityType
-import io.github.eonewg.gnome.data.local.entity.SyncOperationEntity
-import io.github.eonewg.gnome.data.local.entity.SyncOperationType
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
@@ -22,7 +16,6 @@ import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.sync.SyncEngine
 import io.github.eonewg.gnome.sync.SyncFileStore
 import io.github.eonewg.gnome.sync.SyncScheduler
-import io.github.eonewg.gnome.sync.TransactionRunner
 import io.github.eonewg.gnome.ext.getErrorMessage
 import io.github.eonewg.gnome.util.extractCustomTags
 import kotlinx.coroutines.CoroutineScope
@@ -51,12 +44,10 @@ import java.util.UUID
  * one transaction — local success IS user success. The actual server push is
  * delegated to WorkManager via [SyncScheduler] and executed by [SyncEngine],
  * which also serves the manual sync path ([sync]) so there is exactly one
- * synchronization algorithm.
+ * synchronization algorithm. All Room access goes through [LocalMemoDataSource].
  */
 class SyncingRepository(
-    private val database: GnomeDatabase,
-    private val memoDao: MemoDao,
-    private val syncOperationDao: SyncOperationDao,
+    private val localData: LocalMemoDataSource,
     private val fileStorage: FileStorage,
     private val remoteRepository: RemoteRepository,
     private val account: Account,
@@ -67,15 +58,10 @@ class SyncingRepository(
     val accountKeyValue: String get() = account.accountKey()
 
     private val engine = SyncEngine(
-        memoDao = memoDao,
-        syncOperationDao = syncOperationDao,
-        fileStore = SyncFileStore { fileStorage.deleteFile(it) },
+        localData = localData,
+        fileStore = SyncFileStore { uri -> fileStorage.deleteFile(uri.toUri()) },
         remoteRepository = remoteRepository,
         account = account,
-        transactionRunner = object : TransactionRunner {
-            override suspend fun <R> inTransaction(block: suspend () -> R): R =
-                database.withTransaction { block() }
-        },
         onUserSynced = onUserSynced,
     )
 
@@ -90,21 +76,21 @@ class SyncingRepository(
 
     init {
         statusScope.launch {
-            memoDao.observeUnsyncedCount(accountKeyValue).collect { count ->
+            localData.observeUnsyncedCount(accountKeyValue).collect { count ->
                 _syncStatus.update { it.copy(unsyncedCount = count) }
             }
         }
     }
 
     override fun observeMemos(): Flow<List<MemoEntity>> {
-        return memoDao.observeAllMemos(accountKeyValue).map { memos ->
+        return localData.observeTimeline(accountKeyValue).map { memos ->
             memos.map { it.toMemoEntity() }
         }
     }
 
     override suspend fun listMemos(): ApiResponse<List<MemoEntity>> {
         return try {
-            val memos = memoDao.getAllMemos(accountKeyValue).map { withResources(it) }
+            val memos = localData.getTimeline(accountKeyValue).map { withResources(it) }
             ApiResponse.Success(memos)
         } catch (e: Exception) {
             ApiResponse.Failure.Exception(e)
@@ -113,7 +99,7 @@ class SyncingRepository(
 
     override suspend fun listArchivedMemos(): ApiResponse<List<MemoEntity>> {
         return try {
-            val memos = memoDao.getArchivedMemos(accountKeyValue)
+            val memos = localData.getArchived(accountKeyValue)
                 .filterNot { it.isDeleted }
                 .map { withResources(it) }
             ApiResponse.Success(memos)
@@ -144,18 +130,7 @@ class SyncingRepository(
                 lastModified = now,
                 lastSyncedAt = null
             )
-            database.withTransaction {
-                memoDao.insertMemo(localMemo)
-                resources.forEach { resource ->
-                    memoDao.insertResource(
-                        resource.copy(
-                            accountKey = accountKeyValue,
-                            memoId = localMemo.identifier
-                        )
-                    )
-                }
-                enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, localMemo.identifier)
-            }
+            localData.createLocalMemo(localMemo, resources)
             afterLocalWrite()
             ApiResponse.Success(withResources(localMemo))
         } catch (e: Exception) {
@@ -172,7 +147,7 @@ class SyncingRepository(
         pinned: Boolean?
     ): ApiResponse<MemoEntity> {
         return try {
-            val existingMemo = memoDao.getMemoById(identifier, accountKeyValue)
+            val existingMemo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
 
             val updatedMemo = existingMemo.copy(
@@ -183,33 +158,8 @@ class SyncingRepository(
                 isDeleted = false,
                 lastModified = Instant.now()
             )
-            // File deletions run after the transaction: Room transactions must
-            // stay free of file IO. A crash in between only leaves an orphan file.
-            val staleLocalFiles = arrayListOf<Uri>()
-            database.withTransaction {
-                memoDao.insertMemo(updatedMemo)
-
-                if (resources != null) {
-                    val existingResources = memoDao.getMemoResources(identifier, accountKeyValue)
-                    val incomingIds = resources.mapTo(hashSetOf()) { it.identifier }
-                    existingResources.forEach { existing ->
-                        if (existing.identifier !in incomingIds) {
-                            localFileUriOf(existing)?.let(staleLocalFiles::add)
-                            memoDao.deleteResource(existing)
-                        }
-                    }
-                    resources.forEach { resource ->
-                        memoDao.insertResource(
-                            resource.copy(
-                                accountKey = accountKeyValue,
-                                memoId = identifier
-                            )
-                        )
-                    }
-                }
-                enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, updatedMemo.identifier)
-            }
-            staleLocalFiles.forEach(fileStorage::deleteFile)
+            val staleFiles = localData.updateLocalMemo(updatedMemo, resources)
+            deleteFilesAfterCommit(staleFiles)
             afterLocalWrite()
             ApiResponse.Success(withResources(updatedMemo))
         } catch (e: Exception) {
@@ -219,18 +169,9 @@ class SyncingRepository(
 
     override suspend fun deleteMemo(identifier: String): ApiResponse<Unit> {
         return try {
-            val memo = memoDao.getMemoById(identifier, accountKeyValue)
+            val memo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
-            database.withTransaction {
-                memoDao.insertMemo(
-                    memo.copy(
-                        isDeleted = true,
-                        needsSync = true,
-                        lastModified = Instant.now()
-                    )
-                )
-                enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.DELETE, identifier)
-            }
+            localData.markMemoDeleted(memo)
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -240,18 +181,9 @@ class SyncingRepository(
 
     override suspend fun archiveMemo(identifier: String): ApiResponse<Unit> {
         return try {
-            val memo = memoDao.getMemoById(identifier, accountKeyValue)
+            val memo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
-            database.withTransaction {
-                memoDao.insertMemo(
-                    memo.copy(
-                        archived = true,
-                        needsSync = true,
-                        lastModified = Instant.now()
-                    )
-                )
-                enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, identifier)
-            }
+            localData.setMemoArchived(memo, archived = true)
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -261,18 +193,9 @@ class SyncingRepository(
 
     override suspend fun restoreMemo(identifier: String): ApiResponse<Unit> {
         return try {
-            val memo = memoDao.getMemoById(identifier, accountKeyValue)
+            val memo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
-            database.withTransaction {
-                memoDao.insertMemo(
-                    memo.copy(
-                        archived = false,
-                        needsSync = true,
-                        lastModified = Instant.now()
-                    )
-                )
-                enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, identifier)
-            }
+            localData.setMemoArchived(memo, archived = false)
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -282,7 +205,7 @@ class SyncingRepository(
 
     override suspend fun listTags(): ApiResponse<List<String>> {
         return try {
-            val localTags = memoDao.getAllMemos(accountKeyValue)
+            val localTags = localData.getTimeline(accountKeyValue)
                 .asSequence()
                 .flatMap { extractCustomTags(it.content).asSequence() }
                 .filter { it.isNotBlank() }
@@ -303,8 +226,7 @@ class SyncingRepository(
 
     override suspend fun listResources(): ApiResponse<List<ResourceEntity>> {
         return try {
-            val resources = memoDao.getAllResources(accountKeyValue)
-            ApiResponse.Success(resources)
+            ApiResponse.Success(localData.getAllResources(accountKeyValue))
         } catch (e: Exception) {
             ApiResponse.Failure.Exception(e)
         }
@@ -333,25 +255,10 @@ class SyncingRepository(
                 mimeType = type?.toString(),
                 memoId = memoIdentifier
             )
-            database.withTransaction {
-                memoDao.insertResource(resource)
-                if (!memoIdentifier.isNullOrBlank()) {
-                    memoDao.getMemoById(memoIdentifier, accountKeyValue)?.let { memo ->
-                        memoDao.insertMemo(
-                            memo.copy(
-                                needsSync = true,
-                                lastModified = Instant.now()
-                            )
-                        )
-                    }
-                    enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, memoIdentifier)
-                } else {
-                    enqueueOutbox(
-                        SyncEntityType.ATTACHMENT,
-                        SyncOperationType.UPSERT,
-                        resource.identifier
-                    )
-                }
+            if (!memoIdentifier.isNullOrBlank()) {
+                localData.attachResourceToMemo(resource, memoIdentifier)
+            } else {
+                localData.insertStandaloneResource(resource)
             }
             afterLocalWrite()
             ApiResponse.Success(resource)
@@ -362,39 +269,11 @@ class SyncingRepository(
 
     override suspend fun deleteResource(identifier: String): ApiResponse<Unit> {
         return try {
-            val resource = memoDao.getResourceById(identifier, accountKeyValue)
+            val resource = localData.getResource(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Resource not found"))
 
-            val memoId = resource.memoId
-            // Enqueue order matters: the memo update that drops the reference is
-            // queued before the attachment delete, so the server never sees a
-            // memo pointing at a removed attachment (or vice versa for longer
-            // than one operation). File deletion runs after the transaction:
-            // Room transactions must stay free of file IO.
-            database.withTransaction {
-                memoDao.deleteResource(resource)
-
-                if (!memoId.isNullOrBlank()) {
-                    memoDao.getMemoById(memoId, accountKeyValue)?.let { memo ->
-                        memoDao.insertMemo(
-                            memo.copy(
-                                needsSync = true,
-                                lastModified = Instant.now()
-                            )
-                        )
-                    }
-                    enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, memoId)
-                }
-                if (resource.remoteId != null) {
-                    enqueueOutbox(
-                        SyncEntityType.ATTACHMENT,
-                        SyncOperationType.DELETE,
-                        resource.identifier,
-                        payload = resource.remoteId
-                    )
-                }
-            }
-            localFileUriOf(resource)?.let(fileStorage::deleteFile)
+            val staleFile = localData.detachResource(resource)
+            staleFile?.let { fileStorage.deleteFile(it.toUri()) }
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -404,7 +283,7 @@ class SyncingRepository(
 
     override suspend fun cacheResourceFile(identifier: String, downloadedUri: Uri): ApiResponse<Unit> {
         return try {
-            val resource = memoDao.getResourceById(identifier, accountKeyValue)
+            val resource = localData.getResource(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Resource not found"))
             val existingLocal = existingLocalUri(resource)
             if (existingLocal != null) {
@@ -435,7 +314,7 @@ class SyncingRepository(
             } else {
                 resource.uri
             }
-            memoDao.insertResource(
+            localData.upsertResource(
                 resource.copy(
                     uri = updatedUri,
                     localUri = canonical
@@ -478,23 +357,8 @@ class SyncingRepository(
         syncScheduler.schedule(accountKeyValue)
     }
 
-    private suspend fun enqueueOutbox(
-        entityType: SyncEntityType,
-        operation: SyncOperationType,
-        entityId: String,
-        payload: String? = null
-    ) {
-        syncOperationDao.enqueue(
-            SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                accountKey = accountKeyValue,
-                entityType = entityType,
-                entityId = entityId,
-                operation = operation,
-                payload = payload,
-                createdAt = Instant.now(),
-            )
-        )
+    private fun deleteFilesAfterCommit(uris: List<String>) {
+        uris.forEach { fileStorage.deleteFile(it.toUri()) }
     }
 
     private fun setSyncing(syncing: Boolean) {
@@ -506,7 +370,7 @@ class SyncingRepository(
     }
 
     private suspend fun withResources(memo: MemoEntity): MemoEntity {
-        val resources = memoDao.getMemoResources(memo.identifier, accountKeyValue)
+        val resources = localData.getMemoResources(memo.identifier, accountKeyValue)
         return memo.copy().also { it.resources = resources }
     }
 
@@ -514,11 +378,6 @@ class SyncingRepository(
         val local = resource.localUri ?: return null
         val uri = local.toUri()
         return if (uri.scheme == "file" && File(uri.path ?: "").exists()) uri else null
-    }
-
-    private fun localFileUriOf(resource: ResourceEntity): Uri? {
-        return resource.localUri?.toUri()
-            ?: resource.uri.toUri().takeIf { it.scheme == "file" }
     }
 
     override fun close() {

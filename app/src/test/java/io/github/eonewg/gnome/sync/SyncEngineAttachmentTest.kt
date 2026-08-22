@@ -1,6 +1,7 @@
 package io.github.eonewg.gnome.sync
 
 import com.skydoves.sandwich.ApiResponse
+import io.github.eonewg.gnome.data.local.LocalMemoDataSource
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.local.entity.SyncEntityType
@@ -35,14 +36,10 @@ class SyncEngineAttachmentTest {
     private val deletedFiles = mutableListOf<String>()
 
     private val engine = SyncEngine(
-        memoDao = memoDao,
-        syncOperationDao = operationDao,
-        fileStore = SyncFileStore { deletedFiles.add(it.toString()) },
+        localData = LocalMemoDataSource(memoDao, operationDao, passthroughRunner()),
+        fileStore = SyncFileStore { deletedFiles.add(it) },
         remoteRepository = remote,
         account = Account.Local(),
-        transactionRunner = object : TransactionRunner {
-            override suspend fun <R> inTransaction(block: suspend () -> R): R = block()
-        },
     )
 
     @Test

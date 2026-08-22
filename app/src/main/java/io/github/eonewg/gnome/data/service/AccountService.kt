@@ -27,6 +27,8 @@ import io.github.eonewg.gnome.data.constant.MemosVersionSupport.MEMOS_V1_MAX_VER
 import io.github.eonewg.gnome.data.constant.MemosVersionSupport.MEMOS_V1_MIN_VERSION
 import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.GnomeDatabase
+import io.github.eonewg.gnome.data.local.LocalMemoDataSource
+import io.github.eonewg.gnome.data.local.RoomTransactionRunner
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.LocalAccount
@@ -176,10 +178,13 @@ class AccountService @Inject constructor(
     }
 
     private fun buildSyncingRepository(remote: RemoteRepository, account: Account): SyncingRepository {
-        return SyncingRepository(
-            database,
+        val localData = LocalMemoDataSource(
             database.memoDao(),
             database.syncOperationDao(),
+            RoomTransactionRunner(database),
+        )
+        return SyncingRepository(
+            localData,
             fileStorage,
             remote,
             account,
