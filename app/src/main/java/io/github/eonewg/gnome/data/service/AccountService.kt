@@ -22,7 +22,6 @@ import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.MemosAccount
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.UserData
-import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import okhttp3.OkHttpClient
@@ -50,6 +49,7 @@ open class AccountService @Inject constructor(
     private val memosClientFactory: MemosClientFactory,
     private val compatibilityChecker: ServerCompatibilityChecker,
     private val exportService: AccountExportService,
+    private val accountRefreshListeners: Set<@JvmSuppressWildcards AccountRefreshListener>,
 ) {
     private val mutex = Mutex()
 
@@ -64,6 +64,7 @@ open class AccountService @Inject constructor(
         mutex.withLock {
             accountStore.setCurrentAccountKey(accountKey)
             session.refresh(accountStore.findAccount(accountKey))
+            notifyAccountDataChanged()
         }
     }
 
@@ -72,6 +73,7 @@ open class AccountService @Inject constructor(
         mutex.withLock {
             accountStore.addAccount(account)
             session.refresh(account)
+            notifyAccountDataChanged()
         }
     }
 
@@ -81,10 +83,20 @@ open class AccountService @Inject constructor(
             val newCurrentAccount = accountStore.removeAccount(accountKey)
             session.refresh(newCurrentAccount)
             session.purgeAccountData(accountKey)
+            notifyAccountDataChanged()
         }
     }
 
-    suspend fun getRepository(): AbstractMemoRepository = session.getRepository()
+    /**
+     * Tells account-scoped peripheral surfaces (widgets) to re-read the
+     * current account. Runs after [session.refresh] and the purge, so the
+     * next render can only see the new account's rows.
+     */
+    private fun notifyAccountDataChanged() {
+        accountRefreshListeners.forEach { listener ->
+            runCatching { listener.onAccountDataChanged() }
+        }
+    }
 
     /** The current account's repository under the domain-typed contract. */
     suspend fun getMemoRepository(): MemoRepository = session.getMemoRepository()

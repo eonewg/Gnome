@@ -12,6 +12,7 @@ import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import dagger.hilt.android.HiltAndroidApp
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.ui.security.AppLockSession
+import io.github.eonewg.gnome.widget.MemoTableChangeWatcher
 import okhttp3.Call
 import javax.inject.Inject
 
@@ -19,6 +20,9 @@ import javax.inject.Inject
 class GnomeApp : Application(), SingletonImageLoader.Factory {
     @Inject
     lateinit var accountService: AccountService
+
+    @Inject
+    lateinit var memoTableChangeWatcher: MemoTableChangeWatcher
 
     companion object {
         @SuppressLint("StaticFieldLeak")
@@ -32,6 +36,7 @@ class GnomeApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        memoTableChangeWatcher.start()
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStart(owner: LifecycleOwner) {
                 AppLockSession.markAppForegrounded()

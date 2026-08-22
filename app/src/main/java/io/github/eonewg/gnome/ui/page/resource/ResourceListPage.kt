@@ -35,7 +35,6 @@ import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.MemoImage
-import io.github.eonewg.gnome.ui.component.toResourceRepresentable
 import io.github.eonewg.gnome.viewmodel.ResourceListViewModel
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredGridItems
@@ -121,7 +120,7 @@ fun ResourceListPage(
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     lazyItems(otherResources, key = { it.id }) { resource ->
-                        Attachment(resource = resource.toResourceRepresentable())
+                        Attachment(resource = resource)
                     }
                 }
             }

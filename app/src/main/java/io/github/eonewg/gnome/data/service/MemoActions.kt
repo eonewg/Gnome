@@ -5,8 +5,8 @@ import android.net.Uri
 import androidx.core.net.toUri
 import com.skydoves.sandwich.ApiResponse
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.core.model.Memo
-import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import okhttp3.OkHttpClient
 import java.io.File
@@ -57,19 +57,19 @@ class MemoActions @Inject constructor(
      * when the download or the persist fails. Implements the attachment chip's
      * download-and-cache callback for every memo list.
      */
-    suspend fun downloadAndCache(resource: ResourceRepresentable): Uri? {
+    suspend fun downloadAndCache(resource: Attachment): Uri? {
         val downloaded = downloadAttachmentToCache(
             context = appContext,
             okHttpClient = accountService.httpClient,
             url = resource.uri,
             filename = resource.filename,
         ) ?: return null
-        val response = repository().cacheAttachmentFile(resource.identifier, Uri.fromFile(downloaded))
+        val response = repository().cacheAttachmentFile(resource.id, Uri.fromFile(downloaded))
         downloaded.delete()
         if (response !is ApiResponse.Success) {
             return null
         }
-        val localUri = repository().getAttachment(resource.identifier)?.localUri ?: return null
+        val localUri = repository().getAttachment(resource.id)?.localUri ?: return null
         return localUri.toUri()
     }
 }

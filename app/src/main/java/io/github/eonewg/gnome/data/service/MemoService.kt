@@ -8,7 +8,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.model.SyncStatus
-import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,17 +22,13 @@ open class MemoService @Inject constructor(
     private val syncThreshold = 5000L
     private val syncMutex = Mutex()
 
-    suspend fun getRepository(): AbstractMemoRepository {
-        return accountService.getRepository()
-    }
-
     /** The current account's repository under the domain-typed contract. */
     open suspend fun getMemoRepository(): MemoRepository {
         return accountService.getMemoRepository()
     }
 
     open val syncStatus: Flow<SyncStatus> = accountService.currentAccount.flatMapLatest {
-        accountService.getRepository().syncStatus
+        accountService.getMemoRepository().syncStatus
     }
 
     /** Timeline as domain models — the read path new UI code uses. */
@@ -48,8 +43,7 @@ open class MemoService @Inject constructor(
                 return@withLock ApiResponse.Success(Unit)
             }
 
-            val repo = getRepository()
-            val result = repo.sync()
+            val result = getMemoRepository().sync()
             if (result is ApiResponse.Success) {
                 lastSyncTime = now
             }

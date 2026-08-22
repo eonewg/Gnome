@@ -12,17 +12,13 @@ import io.github.eonewg.gnome.data.model.TagUsage
 import java.time.Instant
 
 /**
- * The feature-facing contract for memo data. New ViewModels and screens
- * depend on this interface only — never on Room entities, ResourceEntity,
- * the legacy data.model.Memo or MemoRepresentable.
+ * The feature-facing contract for memo data. ViewModels, widgets and screens
+ * depend on this interface only — never on Room entities, ResourceEntity or
+ * wire DTOs.
  *
  * Writes follow the local-first pipeline: Room transaction (memo + outbox)
  * → success returned to the caller → background WorkManager sync for
  * remote accounts. Reads expose Room flows projected into domain models.
- *
- * [MemoRepositoryImpl] keeps the old [AbstractMemoRepository] surface as a
- * migration adapter for not-yet-migrated callers; it shrinks away as
- * features move onto this contract.
  */
 interface MemoRepository {
     val accountKeyValue: String

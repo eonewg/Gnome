@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.feature.explore.ExploreMemo
+import io.github.eonewg.gnome.feature.explore.toContentMemo
 
 @Composable
 fun ExploreMemoCard(
@@ -47,7 +48,7 @@ fun ExploreMemoCard(
                 }
             }
 
-            MemoContent(memo, previewMode = false)
+            MemoContent(memo.toContentMemo(), previewMode = false)
         }
     }
 }

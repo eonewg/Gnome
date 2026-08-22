@@ -24,12 +24,12 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.model.ResourceRepresentable
+import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.ext.string
 
 @Composable
 fun InputImage(
-    resource: ResourceRepresentable,
+    resource: Attachment,
     onRemove: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }

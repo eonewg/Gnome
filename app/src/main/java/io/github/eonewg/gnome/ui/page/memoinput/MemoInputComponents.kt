@@ -89,13 +89,11 @@ import androidx.compose.ui.window.PopupProperties
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.core.model.Attachment as DomainAttachment
 import io.github.eonewg.gnome.core.model.MemoVisibility
-import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.ext.icon
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.InputImage
-import io.github.eonewg.gnome.ui.component.toResourceRepresentable
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.core.tag.MemosTagParser
 
@@ -447,7 +445,7 @@ internal fun MemoInputEditor(
             ) {
                 items(imageResources, key = { it.id }) { resource ->
                     InputImage(
-                        resource = resource.toResourceRepresentable(),
+                        resource = resource,
                         onRemove = { onDeleteAttachment(resource.id) },
                     )
                 }
@@ -462,7 +460,7 @@ internal fun MemoInputEditor(
             ) {
                 items(attachmentResources, key = { it.id }) { resource ->
                     Attachment(
-                        resource = resource.toResourceRepresentable(),
+                        resource = resource,
                         onRemove = { onDeleteAttachment(resource.id) }
                     )
                 }

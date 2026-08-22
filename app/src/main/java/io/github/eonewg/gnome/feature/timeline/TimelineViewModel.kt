@@ -16,14 +16,12 @@ import io.github.eonewg.gnome.data.account.SyncCompatibility
 import io.github.eonewg.gnome.data.constant.GnomeException
 import io.github.eonewg.gnome.data.constant.MemosVersionSupport
 import io.github.eonewg.gnome.data.model.Account
-import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.ext.getErrorMessage
 import io.github.eonewg.gnome.core.tag.MemosTagParser
-import io.github.eonewg.gnome.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -121,9 +119,7 @@ class TimelineViewModel @Inject constructor(
             }
 
             val syncResult = memoService.sync(false)
-            if (syncResult is ApiResponse.Success) {
-                WidgetUpdater.updateWidgets(appContext)
-            } else {
+            if (syncResult !is ApiResponse.Success) {
                 if (!syncResult.isAccessTokenInvalidFailure()) {
                     _uiState.update { it.copy(errorMessage = syncResult.getErrorMessage()) }
                 }
@@ -172,7 +168,6 @@ class TimelineViewModel @Inject constructor(
                 if (allowHigherV1Version != null) {
                     accountService.rememberAcceptedUnsupportedSyncVersion(allowHigherV1Version)
                 }
-                WidgetUpdater.updateWidgets(appContext)
             } else {
                 val message = syncResult.getErrorMessage()
                 _uiState.update { it.copy(errorMessage = message) }
@@ -332,7 +327,6 @@ class TimelineViewModel @Inject constructor(
         ).also { response ->
             if (response is ApiResponse.Success) {
                 applyMemoUpdate(response.data)
-                WidgetUpdater.updateWidgets(appContext)
             }
         }
     }
@@ -342,7 +336,6 @@ class TimelineViewModel @Inject constructor(
             memoService.getMemoRepository().updateMemo(memoIdentifier, pinned = pinned).let { response ->
                 if (response is ApiResponse.Success) {
                     applyMemoUpdate(response.data)
-                    WidgetUpdater.updateWidgets(appContext)
                 }
                 response
             }
@@ -352,7 +345,6 @@ class TimelineViewModel @Inject constructor(
         memoService.getMemoRepository().archiveMemo(memoIdentifier).let { response ->
             if (response is ApiResponse.Success) {
                 removeMemoFromState(memoIdentifier)
-                WidgetUpdater.updateWidgets(appContext)
             }
             response
         }
@@ -362,7 +354,6 @@ class TimelineViewModel @Inject constructor(
         memoService.getMemoRepository().deleteMemo(memoIdentifier).let { response ->
             if (response is ApiResponse.Success) {
                 removeMemoFromState(memoIdentifier)
-                WidgetUpdater.updateWidgets(appContext)
             }
             response
         }
@@ -373,14 +364,13 @@ class TimelineViewModel @Inject constructor(
         memoActions.updateContent(memoIdentifier, content).also { response ->
             if (response is ApiResponse.Success) {
                 applyMemoUpdate(response.data)
-                WidgetUpdater.updateWidgets(appContext)
             }
         }
 
     suspend fun cacheResourceFile(resourceIdentifier: String, downloadedUri: Uri): ApiResponse<Unit> =
         memoActions.cacheResource(resourceIdentifier, downloadedUri)
 
-    suspend fun downloadAndCacheResource(resource: ResourceRepresentable): Uri? =
+    suspend fun downloadAndCacheResource(resource: Attachment): Uri? =
         memoActions.downloadAndCache(resource)
 
     private fun applyMemoUpdate(memo: Memo) {

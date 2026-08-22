@@ -21,7 +21,6 @@ import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.suspendOnErrorMessage
 import io.github.eonewg.gnome.ui.page.memoinput.restorableMemoInputDraft
-import io.github.eonewg.gnome.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -181,7 +180,6 @@ class EditorViewModel @Inject constructor(
             }
             _uiState.update { it.copy(submitting = false) }
             response.suspendOnSuccess {
-                WidgetUpdater.updateWidgets(appContext)
                 if (!state.isEditMode) {
                     setText(TextFieldValue(""))
                     persistDraft("")

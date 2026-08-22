@@ -105,7 +105,7 @@ class GnomeGlanceWidgetConfigurationActivity : FragmentActivity() {
         LaunchedEffect(Unit) {
             try {
                 // Fetch tags
-                val result = memoService.getRepository().listTags()
+                val result = memoService.getMemoRepository().listTags()
                 result.suspendOnSuccess {
                     tags = data
                 }

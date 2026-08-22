@@ -5,10 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.skydoves.sandwich.ApiResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.toCore
 import io.github.eonewg.gnome.data.model.Account
-import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
@@ -78,7 +78,7 @@ class TagMemoViewModel @Inject constructor(
     suspend fun cacheResourceFile(resourceId: String, uri: Uri): ApiResponse<Unit> =
         memoActions.cacheResource(resourceId, uri)
 
-    suspend fun downloadAndCacheResource(resource: ResourceRepresentable): Uri? =
+    suspend fun downloadAndCacheResource(resource: Attachment): Uri? =
         memoActions.downloadAndCache(resource)
 
     private fun TagMemoUiState.withAccount(account: Account?): TagMemoUiState = copy(

@@ -14,7 +14,6 @@ import io.github.eonewg.gnome.data.local.LocalMemoDataSource
 import io.github.eonewg.gnome.data.local.RoomTransactionRunner
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.LocalAccount
-import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import io.github.eonewg.gnome.data.repository.MemoRepositoryImpl
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
@@ -79,12 +78,6 @@ class AccountSession @Inject constructor(
         initialization.await()
     }
 
-    suspend fun getRepository(): AbstractMemoRepository {
-        awaitInitialization()
-        return mutex.withLock { repository }
-    }
-
-    /** The current account's repository under the domain-typed contract. */
     suspend fun getMemoRepository(): MemoRepository {
         awaitInitialization()
         return mutex.withLock { repository }

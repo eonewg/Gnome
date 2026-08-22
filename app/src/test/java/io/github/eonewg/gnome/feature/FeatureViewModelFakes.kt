@@ -42,7 +42,7 @@ internal class FakeAccountService private constructor(
     clientFactory: MemosClientFactory,
     checker: ServerCompatibilityChecker,
     export: AccountExportService,
-) : AccountService(accountStore, session, clientFactory, checker, export) {
+) : AccountService(accountStore, session, clientFactory, checker, export, emptySet()) {
 
     val accountState = MutableStateFlow<Account?>(Account.Local())
 

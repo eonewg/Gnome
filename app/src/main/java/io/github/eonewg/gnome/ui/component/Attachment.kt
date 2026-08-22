@@ -30,16 +30,16 @@ import androidx.core.net.toUri
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.GnomeFileProvider
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.model.ResourceRepresentable
+import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.ext.string
 import timber.log.Timber
 import java.io.File
 
 @Composable
 fun Attachment(
-    resource: ResourceRepresentable,
+    resource: Attachment,
     onRemove: (() -> Unit)? = null,
-    onDownloadAndCache: (suspend (ResourceRepresentable) -> Uri?)? = null,
+    onDownloadAndCache: (suspend (Attachment) -> Uri?)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -140,8 +140,8 @@ fun Attachment(
 
 private suspend fun resolveAttachmentFile(
     context: Context,
-    resource: ResourceRepresentable,
-    downloadAndCache: (suspend (ResourceRepresentable) -> Uri?)?,
+    resource: Attachment,
+    downloadAndCache: (suspend (Attachment) -> Uri?)?,
 ): File? {
     existingLocalFile(resource)?.let { return it }
 
@@ -160,7 +160,7 @@ private suspend fun resolveAttachmentFile(
     return canonical
 }
 
-private fun existingLocalFile(resource: ResourceRepresentable): File? {
+private fun existingLocalFile(resource: Attachment): File? {
     val local = (resource.localUri ?: resource.uri).toUri()
     if (local.scheme != "file") {
         return null
@@ -169,7 +169,7 @@ private fun existingLocalFile(resource: ResourceRepresentable): File? {
     return File(path).takeIf { it.exists() }
 }
 
-private fun resolveMimeType(resource: ResourceRepresentable, file: File): String {
+private fun resolveMimeType(resource: Attachment, file: File): String {
     resource.mimeType?.takeIf { it.isNotBlank() }?.let { return it }
     val ext = file.extension.lowercase()
     if (ext.isBlank()) {

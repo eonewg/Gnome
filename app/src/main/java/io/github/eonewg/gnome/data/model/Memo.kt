@@ -9,14 +9,14 @@ enum class MemoVisibility {
 }
 
 data class Memo(
-    override val remoteId: String,
-    override val content: String,
-    override val date: Instant,
-    override val pinned: Boolean,
-    override val visibility: MemoVisibility,
-    override val resources: List<Resource>,
+    val remoteId: String,
+    val content: String,
+    val date: Instant,
+    val pinned: Boolean,
+    val visibility: MemoVisibility,
+    val resources: List<Resource>,
     val tags: List<String>,
     val creator: User? = null,
-    override val archived: Boolean = false,
+    val archived: Boolean = false,
     val updatedAt: Instant? = null,
-) : MemoRepresentable
+)

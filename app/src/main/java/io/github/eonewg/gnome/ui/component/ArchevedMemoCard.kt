@@ -65,7 +65,7 @@ fun ArchivedMemoCard(
                 ArchivedMemosCardActionButton(memo, onRestore = onRestore, onDelete = onDelete)
             }
 
-            MemoContent(memo.toRepresentable(), previewMode = false)
+            MemoContent(memo, previewMode = false)
         }
     }
 }

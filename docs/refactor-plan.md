@@ -263,8 +263,102 @@
     - 仍需真机 smoke：NavDisplay 动画/手势、登录流、配置变更与进程死亡的
       entry 状态（automated instrumentation 需设备环境）。
 
-### Phase 18 — Widget / Quick Capture 架构清理
-- Deferred。
+### Phase 18 — Widget / Quick Capture / Peripheral Architecture Cleanup
+- In progress。先审计后修改：
+
+  外围审计结果（2026-08-22，HEAD dc29e9c6）：
+
+  A. **MainActivity** — 单活动宿主 Navigation 3；intent action 处理集中在
+     `ui/page/common/Navigation.kt`（SEND/SEND_MULTIPLE → ShareKey、ACTION_NEW_MEMO →
+     EditorKey、ACTION_QUICK_MEMO → 内联 quick editor、EDIT/VIEW_MEMO → typed key）。
+     冷启动不依赖内存状态；进程死亡恢复由 rememberNavBackStack 承载。无问题。
+  B. **QuickMemoActivity** — 独立宿主保留（规范禁止删除），但当前无任何调用方
+     （QS Tile 走 MainActivity.ACTION_QUICK_MEMO 冷启动路径）；行为自洽：无账号 →
+     跳 MainActivity + finish，有账号 → EditorRoute(onFinished=finish)；冷启动账号
+     恢复经 AccountSessionViewModel（持久 AccountStore）。Manifest：exported=false、
+     singleTop、taskAffinity=${applicationId}.quickcapture、excludeFromRecents ✓。
+  C. **Quick Settings Tile** — 单向 Tile → MainActivity 冷启动路径（API 33+ 用
+     PendingIntent + startActivityAndCollapse）；不依赖 Activity scoped VM、不等待
+     HTTP。✓
+  D. **Glance Widget ×2** — 数据源经 `MemoService.getRepository().listMemos()`：
+     legacy AbstractMemoRepository 门面 + 返回 Room entity（MemoEntity），违反两条
+     验收（Widget 依赖 AbstractMemoRepository、依赖 Room Entity）；数据本身已是
+     本地 Room（listMemos 读 Room，非 HTTP）✓，但类型与入口需迁移到 domain
+     （MemoRepository + core.model.Memo）。账号切换/登出后无刷新触发（缺口，
+     widget 重新渲染时才读到新账号）。
+  E. **Share Intent** — Nav3 ShareKey 消费；URI grant 由系统授给启动 activity ✓；
+     缺陷：shareContent 存 `remember`（非保存态），Activity 重建（旋转/
+     process death）后 ShareKey 恢复但内容丢失 → 空编辑器。需 saveable 化。
+  F. **FileProvider** — authority = `${applicationId}.fileprovider`（GnomeFileProvider
+     动态取 packageName）✓；paths 覆盖 cache（images/image_cache/coil3_disk_cache）
+     与 files（images/resources）✓；无旧 authority 残留。
+  G. **Widget update scheduling** — 现状三处触发：ViewModel 直调 9 处（写成功后）、
+     SyncWorker 成功后 1 处、30 分钟 periodic work；另有 widget 内手动 refresh。
+     记账号切换/登出缺触发。未去重（连续编辑多次全量 update）。
+  H. **Legacy 命名** — `me.mudkip` / `MoeMemos` / `moememos` 代码与资源零残留
+     （README/LICENSE 品牌致谢除外，符合规范）。
+
+  修改计划：
+
+  1. Widget 数据源迁移：`memoService.getMemoRepository()`（MemoRepository 领域契约）
+     + `observeTimeline().first()`（Room 快照，离线可渲染）+ `core.model.Memo`；
+     过滤/排序/截断抽纯函数 `widget/WidgetMemoSelection.kt`（可测）。
+  2. 删除 `AbstractMemoRepository`：解除 MemoRepositoryImpl 继承（entity 形态方法
+     降为 private 或删除，domain 委托不变）；删除 AccountSession/AccountService/
+     MemoService 的 `getRepository()` 门面，`MemoService.sync`/`syncStatus` 改走
+     domain 契约。
+  3. 删除 `MemoRepresentable`/`ResourceRepresentable`：UI 组件（MemoContent/
+     Attachment/InputImage/MemoCardActions/MemoInputComponents）与 5 个 ViewModel
+     的 downloadAndCache 回调直接消费 core.model.Memo / core.model.Attachment；
+     MemoEntity/ResourceEntity 与 wire data.model.Memo/Resource 去掉接口实现；
+     删除 DomainRepresentable.kt/Representable.kt；ExploreMemo 改为独立展示模型
+     （不实现 legacy 接口）。
+  4. Widget 刷新收口为单一策略：`widget/MemoTableChangeWatcher`（Room
+     InvalidationTracker 观察 memos/resources 表，debounce 合并）覆盖本地写 +
+     远程 pull（SyncWorker 同步最终也写 Room）；ViewModel/SyncWorker 的手动调用
+     移除。"账号变更"走 `AccountRefreshListener`（Hilt multibinding，widget 实现
+     刷新 + 登出后旧账号数据已 purge，不泄露）：AccountService.switch/add/remove
+     后统一通知。periodic work 保留。
+  5. Share recreation 修复：Navigation.kt 的 shareContent 改 rememberSaveable
+     （自定义 Saver：text + Uri 字符串列表）。
+  6. 测试：WidgetMemoSelectionTest（选择/排序/空/最新 N 条/内存随机 pick）、
+     ShareContent parseIntent 测试（text/图片/空/不支持 MIME）。
+  7. 不修改：Navigation 3、SyncEngine、Outbox、Tag/Search/Stats、主界面、gradle
+     模块化、QuickMemoActivity 保留、不为 widget 建立第二套数据架构。
+  8. 验证：testDebugUnitTest + assembleDebug + assembleRelease，单独 Phase 18 commit。
+- **Done**（commit pending）：
+  - Widget 数据源迁移：`GnomeGlanceWidget` / `MemoryGlanceWidget` / 配置页改走
+    `MemoService.getMemoRepository()` + `observeTimeline().first()`（Room 快照，
+    离线可渲染），渲染与选择逻辑消费 `core.model.Memo`；过滤/排序/截断/内存随机
+    pick 抽为纯函数 `widget/WidgetMemoSelection.kt`。
+  - 删除 `AbstractMemoRepository`（含 `data/repository/AbstractMemoRepository.kt`）：
+    `MemoRepositoryImpl` 解除继承（entity 形态方法降为 private 或删除），
+    `AccountSession`/`AccountService`/`MemoService` 的 `getRepository()` 门面删除，
+    `MemoService.sync`/`syncStatus` 走 domain 契约。
+  - 删除 `MemoRepresentable` / `ResourceRepresentable`（Representable.kt +
+    DomainRepresentable.kt）：UI 组件（MemoContent/Attachment/InputImage/
+    MemoCardActions/MemoInputComponents/ResourceListPage/ExploreMemoCard）与 5 个
+    ViewModel 的 downloadAndCache 回调直接消费 `core.model.Memo`/`core.model.Attachment`；
+    MemoEntity/ResourceEntity 与 wire data.model.Memo/Resource 去掉接口实现；
+    ExploreMemo 改为独立展示模型（resources → core Attachment、visibility → core）。
+  - Widget 刷新收口为单一策略：`widget/MemoTableChangeWatcher`（Room
+    InvalidationTracker 观察 memos/resources，2s coalesce）覆盖本地写 +
+    远程 pull（SyncWorker 同步写 Room 即触发）；ViewModel 9 处与 SyncWorker 的
+    手动调用移除；账号 switch/add/remove 走 `data/service/AccountRefreshListener`
+    （Hilt @IntoSet 绑定，widget 实现刷新——登出后旧账号数据已 purge 才触发）。
+    `WidgetUpdater.kt` 删除；30 分钟 periodic work 保留。
+  - Share recreation 修复：Navigation.kt 的 shareContent 改 `rememberSaveable`
+    （listSaver：text + Uri 字符串列表），旋转/进程死亡后 ShareKey 仍恢复内容。
+  - 测试：新增 `widget/WidgetMemoSelectionTest` 7 用例（排序/标签过滤/置顶/
+    截断/空态/内存 pick）、`data/model/ShareContentTest` 6 用例（文本/单图/多图/
+    不支持 MIME/空 intent/空白文本）、`data/local/MemoTimelineFilterTest` 2 用例
+    （observeTimeline 排除 archived/deleted + 账号隔离 = widget 显示契约）。
+    **164 单测全绿**，assembleDebug + assembleRelease 通过。
+  - 审计结论（未改项）：QS Tile 走 MainActivity.ACTION_QUICK_MEMO 冷启动路径、
+    QuickMemoActivity 为保留的独立宿主（无调用方）、FileProvider authority 已用
+    `${applicationId}`、Manifest 无旧包名残留、`me.mudkip`/`MoeMemos` 代码与资源
+    零残留。仍未覆盖的真机项：Tile 点击 → 编辑器路径、账号切换后 widget 刷新、
+    Share 旋转恢复、附录（widget 刷新链路依赖 Glance manager 与进程存活）。
 
 ### Phase 19 — 性能 / Baseline Profile / 回归
 - Deferred。

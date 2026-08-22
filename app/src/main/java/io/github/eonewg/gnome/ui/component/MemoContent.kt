@@ -29,7 +29,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.model.MemoRepresentable
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.media.MediaViewerActivity
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
@@ -46,7 +46,7 @@ import kotlin.math.ceil
 
 @Composable
 fun MemoContent(
-    memo: MemoRepresentable,
+    memo: Memo,
     previewMode: Boolean = false,
     checkboxChange: (checked: Boolean, startOffset: Int, endOffset: Int) -> Unit = { _, _, _ -> },
     isPreviewExpanded: Boolean = false,
@@ -350,12 +350,12 @@ private fun isPreviewWhitespaceToken(node: ASTNode): Boolean {
 
 @Composable
 fun MemoResourceContent(
-    memo: MemoRepresentable,
+    memo: Memo,
     actions: MemoCardActions = MemoCardActions(),
 ) {
     val cols = 3
     val context = LocalContext.current
-    val imageList = memo.resources.filter { it.mimeType?.startsWith("image/") == true }
+    val imageList = memo.attachments.filter { it.mimeType?.startsWith("image/") == true }
     val imageUrls = remember(imageList) {
         imageList.map { resource -> resource.localUri ?: resource.uri }
     }
@@ -373,7 +373,7 @@ fun MemoResourceContent(
                                     .aspectRatio(1f)
                                     .padding(3.dp)
                                     .clip(RoundedCornerShape(12.dp)),
-                                resourceIdentifier = imageList[index].identifier,
+                                resourceIdentifier = imageList[index].id,
                                 onCacheResource = actions.onCacheResource,
                                 onClick = {
                                     context.startActivity(
@@ -393,7 +393,7 @@ fun MemoResourceContent(
             }
         }
     }
-    memo.resources.filterNot { it.mimeType?.startsWith("image/") == true }.forEach { resource ->
+    memo.attachments.filterNot { it.mimeType?.startsWith("image/") == true }.forEach { resource ->
         Attachment(resource, onDownloadAndCache = actions.onDownloadAndCache)
     }
 }

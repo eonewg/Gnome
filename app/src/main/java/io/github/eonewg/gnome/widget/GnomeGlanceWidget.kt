@@ -49,14 +49,14 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.skydoves.sandwich.suspendOnSuccess
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import io.github.eonewg.gnome.MainActivity
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.data.service.MemoService
 import java.time.Instant
 
@@ -81,7 +81,7 @@ class GnomeGlanceWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(context: Context, memoService: MemoService, prefs: Preferences) {
-        var memos by remember { mutableStateOf<List<MemoEntity>>(emptyList()) }
+        var memos by remember { mutableStateOf<List<Memo>>(emptyList()) }
         var isLoading by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
 
@@ -94,22 +94,11 @@ class GnomeGlanceWidget : GlanceAppWidget() {
             withContext(Dispatchers.IO) {
                 try {
                     isLoading = true
-                    memoService.getRepository().listMemos().suspendOnSuccess {
-                        // Filter and sort memos
-                        val filteredMemos = data.filter { memo ->
-                            val matchesTag = filterTag == null || memo.content.contains("#$filterTag")
-                            val matchesPinned = !pinnedOnly || memo.pinned
-                            matchesTag && matchesPinned
-                        }
-                        
-                        val sortedMemos = filteredMemos.sortedWith(
-                            compareByDescending<MemoEntity> { it.pinned }
-                                .thenByDescending { it.date }
-                        ).take(maxItems)
-                        
-                        memos = sortedMemos
-                        error = null
-                    }
+                    // Snapshot of the Room-backed timeline; never a network call,
+                    // so the widget renders the latest local memos offline.
+                    val timeline = memoService.getMemoRepository().observeTimeline().first()
+                    memos = selectWidgetMemos(timeline, filterTag, pinnedOnly, maxItems)
+                    error = null
                 } catch (e: Exception) {
                     error = e.message ?: "Unknown error"
                     android.util.Log.e("GnomeWidget", "Exception in widget", e)
@@ -246,7 +235,7 @@ class GnomeGlanceWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun MemoItem(context: Context, memo: MemoEntity, isLastMemo: Boolean = false) {
+    private fun MemoItem(context: Context, memo: Memo, isLastMemo: Boolean = false) {
         // Card-like container with rounded corners
         Box(
             modifier = GlanceModifier
@@ -263,7 +252,7 @@ class GnomeGlanceWidget : GlanceAppWidget() {
                             else R.drawable.widget_card_background
                         )
                     )
-                    .clickable(actionStartActivity(createViewMemoIntent(context, memo.identifier)))
+                    .clickable(actionStartActivity(createViewMemoIntent(context, memo.id)))
                     .padding(12.dp, 12.dp, 12.dp, if (isLastMemo) 8.dp else 12.dp)
             ) {
                 // Memo header

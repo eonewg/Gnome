@@ -13,7 +13,6 @@ import io.github.eonewg.gnome.core.model.toEntity
 import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.LocalMemoDataSource
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
-import io.github.eonewg.gnome.data.local.entity.MemoWithResources
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoVisibility
@@ -49,9 +48,8 @@ import java.util.UUID
 /**
  * Gnome's single feature-facing memo entry point, replacing the former
  * SyncingRepository / LocalDatabaseRepository split. Implements the
- * domain-typed [MemoRepository] contract for new feature code; the
- * inherited [AbstractMemoRepository] entity surface stays as a migration
- * adapter for callers that have not moved yet.
+ * domain-typed [MemoRepository] contract; the legacy entity-shaped adapter
+ * surface is gone.
  *
  * One code path for every account kind:
  *  - writes: [LocalMemoDataSource] transaction (entity + outbox) → SyncScheduler
@@ -69,7 +67,7 @@ class MemoRepositoryImpl(
     private val syncScheduler: SyncScheduler? = null,
     private val remote: RemoteDataSource? = null,
     private val onUserSynced: suspend (User) -> Unit = {},
-) : AbstractMemoRepository(), MemoRepository {
+) : MemoRepository {
 
     override val accountKeyValue: String get() = account.accountKey()
 
@@ -198,31 +196,6 @@ class MemoRepositoryImpl(
         return cacheResourceFile(identifier, downloadedUri)
     }
 
-    override fun observeMemos(): Flow<List<MemoEntity>> {
-        return localData.observeTimeline(accountKeyValue).map { memos ->
-            memos.map { it.toMemoEntity() }
-        }
-    }
-
-    override suspend fun listMemos(): ApiResponse<List<MemoEntity>> {
-        return try {
-            ApiResponse.Success(localData.getTimeline(accountKeyValue).map { withResources(it) })
-        } catch (e: Exception) {
-            ApiResponse.Failure.Exception(e)
-        }
-    }
-
-    override suspend fun listArchivedMemos(): ApiResponse<List<MemoEntity>> {
-        return try {
-            val memos = localData.getArchived(accountKeyValue)
-                .filterNot { it.isDeleted }
-                .map { withResources(it) }
-            ApiResponse.Success(memos)
-        } catch (e: Exception) {
-            ApiResponse.Failure.Exception(e)
-        }
-    }
-
     override suspend fun listTags(): ApiResponse<List<String>> {
         return try {
             val localTags = localData.observeTags(accountKeyValue).first()
@@ -270,27 +243,15 @@ class MemoRepositoryImpl(
         localData.searchMemos(accountKeyValue, query, includeArchived, tag, dateFrom, dateTo)
             .map { rows -> rows.map { it.toDomain() } }
 
-    override suspend fun listResources(): ApiResponse<List<ResourceEntity>> {
-        return try {
-            ApiResponse.Success(localData.getAllResources(accountKeyValue))
-        } catch (e: Exception) {
-            ApiResponse.Failure.Exception(e)
-        }
-    }
-
-    override suspend fun getCurrentUser(): ApiResponse<User> {
-        return ApiResponse.Success(engine?.currentUser ?: account.toUser())
-    }
-
     // -----------------------------------------------------------------------
     // Writes (transaction first, then schedule the push)
     // -----------------------------------------------------------------------
 
-    override suspend fun createMemo(
+    private suspend fun createMemo(
         content: String,
         visibility: MemoVisibility,
         resources: List<ResourceEntity>,
-        tags: List<String>?
+        tags: List<String>? = null,
     ): ApiResponse<MemoEntity> {
         return try {
             val now = Instant.now()
@@ -316,7 +277,7 @@ class MemoRepositoryImpl(
         }
     }
 
-    override suspend fun updateMemo(
+    private suspend fun updateMemo(
         identifier: String,
         content: String?,
         resources: List<ResourceEntity>?,
@@ -390,7 +351,7 @@ class MemoRepositoryImpl(
         }
     }
 
-    override suspend fun createResource(
+    private suspend fun createResource(
         filename: String,
         type: MediaType?,
         contentUri: Uri,
@@ -425,7 +386,7 @@ class MemoRepositoryImpl(
         }
     }
 
-    override suspend fun deleteResource(identifier: String): ApiResponse<Unit> {
+    private suspend fun deleteResource(identifier: String): ApiResponse<Unit> {
         return try {
             val resource = localData.getResource(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Resource not found"))
@@ -439,7 +400,7 @@ class MemoRepositoryImpl(
         }
     }
 
-    override suspend fun cacheResourceFile(identifier: String, downloadedUri: Uri): ApiResponse<Unit> {
+    private suspend fun cacheResourceFile(identifier: String, downloadedUri: Uri): ApiResponse<Unit> {
         return try {
             val resource = localData.getResource(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Resource not found"))
@@ -570,8 +531,4 @@ internal fun mergeTags(localTags: Collection<String>, remoteTags: Collection<Str
         .distinct()
         .sorted()
         .toList()
-}
-
-private fun MemoWithResources.toMemoEntity(): MemoEntity {
-    return memo.copy().also { it.resources = resources }
 }

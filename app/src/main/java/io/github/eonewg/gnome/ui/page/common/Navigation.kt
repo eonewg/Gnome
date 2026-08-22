@@ -26,10 +26,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.core.util.Consumer
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,6 +89,27 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
+ * Persists the incoming share payload across activity recreation (rotation,
+ * process death): the SaveableStateHolder restores the back stack, and this
+ * restores the [ShareContent] the ShareKey entry renders. The empty payload
+ * round-trips as null so the editor treats it like no share at all.
+ */
+private val ShareContentSaver = listSaver<ShareContent?, Any>(
+    save = { content ->
+        if (content == null) {
+            listOf("")
+        } else {
+            listOf(content.text) + content.images.map { it.toString() }
+        }
+    },
+    restore = { saved ->
+        val text = saved.firstOrNull() as? String ?: ""
+        val images = saved.drop(1).mapNotNull { (it as? String)?.toUri() }
+        if (saved.size > 1 || text.isNotEmpty()) ShareContent(text, images) else null
+    },
+)
+
+/**
  * The single Navigation 3 host: one typed back stack, one [NavDisplay], and a
  * drawer that only wraps the memo-scoped destinations. The legacy root/inner
  * double NavHost is gone; memo pages (timeline/archived/tag/date/explore/
@@ -105,7 +128,9 @@ fun Navigation() {
     val currentAccount by accountSessionViewModel.currentAccount.collectAsStateWithLifecycle()
     val hasExplore = currentAccount !is Account.Local
     val context = LocalContext.current
-    var shareContent by remember { mutableStateOf<ShareContent?>(null) }
+    var shareContent by rememberSaveable(stateSaver = ShareContentSaver) {
+        mutableStateOf<ShareContent?>(null)
+    }
     var quickMemoRequestId by remember { mutableStateOf(0L) }
     var memoInputActive by rememberSaveable { mutableStateOf(false) }
     val colors = GnomeDesign.colors

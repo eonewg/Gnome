@@ -85,7 +85,6 @@ fun MemosCard(
 ) {
     val scope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
-    val representable = remember(memo) { memo.toRepresentable() }
     var previewExpanded by rememberSaveable(memo.id) { mutableStateOf(false) }
 
     val cardModifier = Modifier
@@ -174,7 +173,7 @@ fun MemosCard(
             }
 
             MemoContent(
-                representable,
+                memo,
                 previewMode = previewMode,
                 imageBaseUrl = host,
                 actions = actions,

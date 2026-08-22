@@ -11,7 +11,6 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import io.github.eonewg.gnome.data.service.AccountService
-import io.github.eonewg.gnome.widget.WidgetUpdateScheduler
 
 /**
  * Executes one full SyncEngine reconcile for an account. Persisted by
@@ -60,14 +59,9 @@ class SyncWorker(
 
     private suspend fun executeSync(repository: MemoRepository): Result {
         return when (val result = repository.sync()) {
-            is ApiResponse.Success -> {
-                try {
-                    WidgetUpdateScheduler.updateAllWidgets(applicationContext)
-                } catch (_: Throwable) {
-                    // Widget refresh is best-effort; never fail a successful sync over it.
-                }
-                Result.success()
-            }
+            // Widget refresh is handled by MemoTableChangeWatcher, which fires
+            // on the Room invalidation this sync writes.
+            is ApiResponse.Success -> Result.success()
             is ApiResponse.Failure.Error -> {
                 val code = result.rawStatusCode()
                 if (code != null && SyncRetryPolicy.isRetryableStatusCode(code)) {

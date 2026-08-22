@@ -52,7 +52,6 @@ import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.component.MemoContent
 import io.github.eonewg.gnome.ui.component.MemosCardActionButton
 import io.github.eonewg.gnome.ui.component.toMemoTimestamp
-import io.github.eonewg.gnome.ui.component.toRepresentable
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -206,7 +205,7 @@ fun MemoDetailPage(
                     }
 
                     MemoContent(
-                        memo = memo.toRepresentable(),
+                        memo = memo,
                         selectable = true,
                         imageBaseUrl = uiState.host,
                         actions = memoCardActions,

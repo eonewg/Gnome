@@ -28,13 +28,13 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import com.skydoves.sandwich.suspendOnSuccess
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import io.github.eonewg.gnome.MainActivity
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.service.MemoService
 import java.time.Instant
 
@@ -56,17 +56,17 @@ class MemoryGlanceWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(context: Context, memoService: MemoService) {
-        var memo by remember { mutableStateOf<MemoEntity?>(null) }
+        var memo by remember { mutableStateOf<Memo?>(null) }
         var isLoading by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(Unit) {
             withContext(Dispatchers.IO) {
                 try {
-                    memoService.getRepository().listMemos().suspendOnSuccess {
-                        memo = data.shuffled().firstOrNull()
-                        error = null
-                    }
+                    // Local Room snapshot; renders the latest memo even offline.
+                    val timeline = memoService.getMemoRepository().observeTimeline().first()
+                    memo = pickMemoryMemo(timeline)
+                    error = null
                 } catch (e: Exception) {
                     error = e.message ?: "Unknown error"
                     android.util.Log.e("MemoryWidget", "Exception in memory widget", e)
@@ -122,7 +122,7 @@ class MemoryGlanceWidget : GlanceAppWidget() {
                     Column(
                         modifier = GlanceModifier
                             .fillMaxSize()
-                            .clickable(actionStartActivity(createViewMemoIntent(context, loadedMemo.identifier)))
+                            .clickable(actionStartActivity(createViewMemoIntent(context, loadedMemo.id)))
                     ) {
                         Text(
                             text = DateUtils.getRelativeTimeSpanString(
