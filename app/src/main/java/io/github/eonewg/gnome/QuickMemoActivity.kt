@@ -22,8 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import io.github.eonewg.gnome.feature.editor.EditorRoute
 import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
-import io.github.eonewg.gnome.ui.page.memoinput.MemoInputPage
 import io.github.eonewg.gnome.ui.security.AppLockGate
 import io.github.eonewg.gnome.ui.theme.GnomeTheme
 import io.github.eonewg.gnome.viewmodel.LocalMemos
@@ -55,7 +55,7 @@ class QuickMemoActivity : FragmentActivity() {
 
                         CompositionLocalProvider(LocalRootNavController provides navController) {
                             if (editorReady) {
-                                MemoInputPage(onFinished = ::finish)
+                                EditorRoute(onFinished = ::finish)
                             } else {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),

@@ -48,9 +48,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
+import io.github.eonewg.gnome.feature.editor.EditorPresentation
+import io.github.eonewg.gnome.feature.editor.EditorRoute
 import io.github.eonewg.gnome.ui.page.common.RouteName
-import io.github.eonewg.gnome.ui.page.memoinput.MemoInputPage
-import io.github.eonewg.gnome.ui.page.memoinput.MemoInputPresentation
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -288,8 +288,8 @@ fun TimelineRoute(
                                 )
                         )
                     }
-                    MemoInputPage(
-                        presentation = MemoInputPresentation.BottomSheet,
+                    EditorRoute(
+                        presentation = EditorPresentation.BottomSheet,
                         onFinished = { closeMemoInput() },
                         active = showMemoInput,
                     )

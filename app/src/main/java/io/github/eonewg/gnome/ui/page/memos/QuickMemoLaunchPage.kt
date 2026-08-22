@@ -56,9 +56,9 @@ import kotlinx.coroutines.flow.first
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.toMemoTimestamp
+import io.github.eonewg.gnome.feature.editor.EditorPresentation
+import io.github.eonewg.gnome.feature.editor.EditorRoute
 import io.github.eonewg.gnome.ui.page.common.LocalRootNavController
-import io.github.eonewg.gnome.ui.page.memoinput.MemoInputPage
-import io.github.eonewg.gnome.ui.page.memoinput.MemoInputPresentation
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.ui.theme.GnomeTheme
 import io.github.eonewg.gnome.viewmodel.LocalUserState
@@ -250,8 +250,8 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
                                     ),
                             )
                         }
-                        MemoInputPage(
-                            presentation = MemoInputPresentation.BottomSheet,
+                        EditorRoute(
+                            presentation = EditorPresentation.BottomSheet,
                             onFinished = { finishCapture() },
                             active = true,
                         )

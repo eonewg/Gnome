@@ -27,10 +27,10 @@ import androidx.navigation.compose.rememberNavController
 import io.github.eonewg.gnome.MainActivity
 import io.github.eonewg.gnome.data.model.ShareContent
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.feature.editor.EditorRoute
 import io.github.eonewg.gnome.ui.page.account.AccountPage
 import io.github.eonewg.gnome.ui.page.account.AddAccountPage
 import io.github.eonewg.gnome.ui.page.login.LoginPage
-import io.github.eonewg.gnome.ui.page.memoinput.MemoInputPage
 import io.github.eonewg.gnome.ui.page.memos.MemoDetailPage
 import io.github.eonewg.gnome.ui.page.memos.MemosPage
 import io.github.eonewg.gnome.ui.page.memos.SearchPage
@@ -91,16 +91,16 @@ fun Navigation() {
                 }
 
                 composable(RouteName.INPUT) {
-                    MemoInputPage()
+                    EditorRoute()
                 }
 
                 composable(RouteName.SHARE) {
-                    MemoInputPage(shareContent = shareContent)
+                    EditorRoute(shareContent = shareContent)
                 }
 
                 composable("${RouteName.EDIT}?memoId={id}"
                 ) { entry ->
-                    MemoInputPage(memoIdentifier = entry.arguments?.getString("id"))
+                    EditorRoute(memoIdentifier = entry.arguments?.getString("id"))
                 }
 
                 composable(RouteName.RESOURCE) {
