@@ -4,6 +4,8 @@ import android.net.Uri
 import androidx.core.net.toUri
 import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.getOrNull
+import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.toDomain
 import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.LocalMemoDataSource
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
@@ -39,32 +41,43 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Local-first facade over the Room cache for a Memos account.
+ * Gnome's single feature-facing memo entry point, replacing the former
+ * SyncingRepository / LocalDatabaseRepository split.
  *
- * Every mutation is committed to Room together with a durable outbox row inside
- * one transaction — local success IS user success. The actual server push is
- * delegated to WorkManager via [SyncScheduler] and executed by [SyncEngine],
- * which also serves the manual sync path ([sync]) so there is exactly one
- * synchronization algorithm. All Room access goes through [LocalMemoDataSource].
+ * One code path for every account kind:
+ *  - writes: [LocalMemoDataSource] transaction (entity + outbox) → SyncScheduler
+ *    for remote accounts; plain persistence for local-only accounts
+ *  - reads: Room flows, optionally projected into the domain model via
+ *    [observeTimeline]
+ *  - sync: [SyncEngine] behind a mutex shared by manual sync and SyncWorker
+ *
+ * Local success IS user success; server push is WorkManager's job.
  */
-class SyncingRepository(
+class MemoRepository(
     private val localData: LocalMemoDataSource,
     private val fileStorage: FileStorage,
-    private val remoteRepository: RemoteDataSource,
     private val account: Account,
-    private val syncScheduler: SyncScheduler,
+    private val syncScheduler: SyncScheduler? = null,
+    private val remote: RemoteDataSource? = null,
     private val onUserSynced: suspend (User) -> Unit = {},
 ) : AbstractMemoRepository() {
 
     val accountKeyValue: String get() = account.accountKey()
 
-    private val engine = SyncEngine(
-        localData = localData,
-        fileStore = SyncFileStore { uri -> fileStorage.deleteFile(uri.toUri()) },
-        remoteRepository = remoteRepository,
-        account = account,
-        onUserSynced = onUserSynced,
-    )
+    /** True for remote (syncing) accounts; local-only accounts just persist. */
+    val syncEnabled: Boolean = remote != null && account !is Account.Local
+
+    private val engine: SyncEngine? = if (syncEnabled && remote != null) {
+        SyncEngine(
+            localData = localData,
+            fileStore = SyncFileStore { uri -> fileStorage.deleteFile(uri.toUri()) },
+            remoteRepository = remote,
+            account = account,
+            onUserSynced = onUserSynced,
+        )
+    } else {
+        null
+    }
 
     private val operationMutex = Mutex()
 
@@ -76,11 +89,22 @@ class SyncingRepository(
     override val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
 
     init {
-        statusScope.launch {
-            localData.observeUnsyncedCount(accountKeyValue).collect { count ->
-                _syncStatus.update { it.copy(unsyncedCount = count) }
+        if (syncEnabled) {
+            statusScope.launch {
+                localData.observeUnsyncedCount(accountKeyValue).collect { count ->
+                    _syncStatus.update { it.copy(unsyncedCount = count) }
+                }
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Reads
+    // -----------------------------------------------------------------------
+
+    /** Timeline as domain models — the read path new UI code should migrate to. */
+    fun observeTimeline(): Flow<List<Memo>> {
+        return localData.observeTimeline(accountKeyValue).map { rows -> rows.map { it.toDomain() } }
     }
 
     override fun observeMemos(): Flow<List<MemoEntity>> {
@@ -91,8 +115,7 @@ class SyncingRepository(
 
     override suspend fun listMemos(): ApiResponse<List<MemoEntity>> {
         return try {
-            val memos = localData.getTimeline(accountKeyValue).map { withResources(it) }
-            ApiResponse.Success(memos)
+            ApiResponse.Success(localData.getTimeline(accountKeyValue).map { withResources(it) })
         } catch (e: Exception) {
             ApiResponse.Failure.Exception(e)
         }
@@ -108,6 +131,47 @@ class SyncingRepository(
             ApiResponse.Failure.Exception(e)
         }
     }
+
+    override suspend fun listTags(): ApiResponse<List<String>> {
+        return try {
+            val localTags = localData.getTimeline(accountKeyValue)
+                .asSequence()
+                .flatMap { extractCustomTags(it.content).asSequence() }
+                .filter { it.isNotBlank() }
+                .toSet()
+            // Remote accounts refresh the tag list from the Memos instance
+            // once per editor entry; network failures fall back to the
+            // offline snapshot. Local accounts derive tags from content only.
+            val remoteTags = if (remote != null) {
+                try {
+                    remote.listTags().getOrNull().orEmpty()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+            ApiResponse.Success(mergeTags(localTags, remoteTags))
+        } catch (e: Exception) {
+            ApiResponse.Failure.Exception(e)
+        }
+    }
+
+    override suspend fun listResources(): ApiResponse<List<ResourceEntity>> {
+        return try {
+            ApiResponse.Success(localData.getAllResources(accountKeyValue))
+        } catch (e: Exception) {
+            ApiResponse.Failure.Exception(e)
+        }
+    }
+
+    override suspend fun getCurrentUser(): ApiResponse<User> {
+        return ApiResponse.Success(engine?.currentUser ?: account.toUser())
+    }
+
+    // -----------------------------------------------------------------------
+    // Writes (transaction first, then schedule the push)
+    // -----------------------------------------------------------------------
 
     override suspend fun createMemo(
         content: String,
@@ -126,12 +190,12 @@ class SyncingRepository(
                 visibility = visibility,
                 pinned = false,
                 archived = false,
-                needsSync = true,
+                needsSync = syncEnabled,
                 isDeleted = false,
                 lastModified = now,
-                lastSyncedAt = null
+                lastSyncedAt = if (syncEnabled) null else now
             )
-            localData.createLocalMemo(localMemo, resources)
+            localData.createLocalMemo(localMemo, resources, sync = syncEnabled)
             afterLocalWrite()
             ApiResponse.Success(withResources(localMemo))
         } catch (e: Exception) {
@@ -151,15 +215,17 @@ class SyncingRepository(
             val existingMemo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
 
+            val updatedAt = Instant.now()
             val updatedMemo = existingMemo.copy(
                 content = content ?: existingMemo.content,
                 visibility = visibility ?: existingMemo.visibility,
                 pinned = pinned ?: existingMemo.pinned,
-                needsSync = true,
+                needsSync = syncEnabled,
                 isDeleted = false,
-                lastModified = Instant.now()
+                lastModified = updatedAt,
+                lastSyncedAt = if (syncEnabled) existingMemo.lastSyncedAt else updatedAt
             )
-            val staleFiles = localData.updateLocalMemo(updatedMemo, resources)
+            val staleFiles = localData.updateLocalMemo(updatedMemo, resources, sync = syncEnabled)
             deleteFilesAfterCommit(staleFiles)
             afterLocalWrite()
             ApiResponse.Success(withResources(updatedMemo))
@@ -172,7 +238,14 @@ class SyncingRepository(
         return try {
             val memo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
-            localData.markMemoDeleted(memo)
+            if (syncEnabled) {
+                localData.markMemoDeleted(memo)
+            } else {
+                // Local accounts have no server to tell; hard-delete instead
+                // of accumulating tombstones nobody would ever drain.
+                val removedResources = localData.purgeMemo(identifier, accountKeyValue)
+                removedResources.forEach { deleteLocalFile(it) }
+            }
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -184,7 +257,7 @@ class SyncingRepository(
         return try {
             val memo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
-            localData.setMemoArchived(memo, archived = true)
+            localData.setMemoArchived(memo, archived = true, sync = syncEnabled)
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -196,38 +269,9 @@ class SyncingRepository(
         return try {
             val memo = localData.getMemo(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Memo not found"))
-            localData.setMemoArchived(memo, archived = false)
+            localData.setMemoArchived(memo, archived = false, sync = syncEnabled)
             afterLocalWrite()
             ApiResponse.Success(Unit)
-        } catch (e: Exception) {
-            ApiResponse.Failure.Exception(e)
-        }
-    }
-
-    override suspend fun listTags(): ApiResponse<List<String>> {
-        return try {
-            val localTags = localData.getTimeline(accountKeyValue)
-                .asSequence()
-                .flatMap { extractCustomTags(it.content).asSequence() }
-                .filter { it.isNotBlank() }
-                .toSet()
-            // Refresh from the current Memos instance once per editor entry.
-            // Network failures intentionally fall back to the offline snapshot.
-            val remoteTags = try {
-                remoteRepository.listTags().getOrNull().orEmpty()
-            } catch (_: Exception) {
-                emptyList()
-            }
-            val tags = mergeTags(localTags, remoteTags)
-            ApiResponse.Success(tags)
-        } catch (e: Exception) {
-            ApiResponse.Failure.Exception(e)
-        }
-    }
-
-    override suspend fun listResources(): ApiResponse<List<ResourceEntity>> {
-        return try {
-            ApiResponse.Success(localData.getAllResources(accountKeyValue))
         } catch (e: Exception) {
             ApiResponse.Failure.Exception(e)
         }
@@ -257,9 +301,9 @@ class SyncingRepository(
                 memoId = memoIdentifier
             )
             if (!memoIdentifier.isNullOrBlank()) {
-                localData.attachResourceToMemo(resource, memoIdentifier)
+                localData.attachResourceToMemo(resource, memoIdentifier, markDirty = syncEnabled)
             } else {
-                localData.insertStandaloneResource(resource)
+                localData.insertStandaloneResource(resource, sync = syncEnabled)
             }
             afterLocalWrite()
             ApiResponse.Success(resource)
@@ -273,7 +317,7 @@ class SyncingRepository(
             val resource = localData.getResource(identifier, accountKeyValue)
                 ?: return ApiResponse.Failure.Exception(Exception("Resource not found"))
 
-            val staleFile = localData.detachResource(resource)
+            val staleFile = localData.detachResource(resource, sync = syncEnabled)
             staleFile?.let { fileStorage.deleteFile(it.toUri()) }
             afterLocalWrite()
             ApiResponse.Success(Unit)
@@ -327,16 +371,17 @@ class SyncingRepository(
         }
     }
 
-    override suspend fun getCurrentUser(): ApiResponse<User> {
-        return ApiResponse.Success(engine.currentUser)
-    }
+    // -----------------------------------------------------------------------
+    // Sync
+    // -----------------------------------------------------------------------
 
     override suspend fun sync(): ApiResponse<Unit> {
+        val syncEngine = engine ?: return ApiResponse.Success(Unit)
         return withContext(Dispatchers.IO) {
             operationMutex.withLock {
                 setSyncing(true)
                 try {
-                    val result = engine.reconcile()
+                    val result = syncEngine.reconcile()
                     if (result is ApiResponse.Success) {
                         setSyncError(null)
                     } else {
@@ -354,12 +399,29 @@ class SyncingRepository(
         }
     }
 
+    override fun close() {
+        statusScope.cancel()
+    }
+
+    // -----------------------------------------------------------------------
+    // Internals
+    // -----------------------------------------------------------------------
+
     private suspend fun afterLocalWrite() {
-        syncScheduler.schedule(accountKeyValue)
+        if (syncEnabled) {
+            syncScheduler?.schedule(accountKeyValue)
+        }
     }
 
     private fun deleteFilesAfterCommit(uris: List<String>) {
         uris.forEach { fileStorage.deleteFile(it.toUri()) }
+    }
+
+    private fun deleteLocalFile(resource: ResourceEntity) {
+        val uri = resource.localUri ?: resource.uri.takeIf { it.startsWith("file:") }
+        if (uri != null) {
+            fileStorage.deleteFile(uri.toUri())
+        }
     }
 
     private fun setSyncing(syncing: Boolean) {
@@ -379,10 +441,6 @@ class SyncingRepository(
         val local = resource.localUri ?: return null
         val uri = local.toUri()
         return if (uri.scheme == "file" && File(uri.path ?: "").exists()) uri else null
-    }
-
-    override fun close() {
-        statusScope.cancel()
     }
 }
 

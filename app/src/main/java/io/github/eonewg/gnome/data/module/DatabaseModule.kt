@@ -6,11 +6,9 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.GnomeDatabase
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
-import io.github.eonewg.gnome.data.repository.LocalDatabaseRepository
 import javax.inject.Singleton
 
 @Module
@@ -30,11 +28,4 @@ object DatabaseModule {
     @Singleton
     @Provides
     fun provideSyncOperationDao(database: GnomeDatabase) = database.syncOperationDao()
-
-    @Singleton
-    @Provides
-    fun provideLocalDatabaseRepository(
-        memoDao: MemoDao,
-        fileStorage: FileStorage
-    ) = LocalDatabaseRepository(memoDao, fileStorage)
 }

@@ -9,7 +9,7 @@ import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import io.github.eonewg.gnome.data.repository.SyncingRepository
+import io.github.eonewg.gnome.data.repository.MemoRepository
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.widget.WidgetUpdateScheduler
 
@@ -40,7 +40,7 @@ class SyncWorker(
         ).accountService()
 
         val handle = try {
-            accountService.getSyncingRepository(accountKey) ?: return Result.success()
+            accountService.getSyncRepository(accountKey) ?: return Result.success()
         } catch (e: Throwable) {
             return if (SyncRetryPolicy.isRetryable(e)) {
                 Result.retry()
@@ -58,7 +58,7 @@ class SyncWorker(
         }
     }
 
-    private suspend fun executeSync(repository: SyncingRepository): Result {
+    private suspend fun executeSync(repository: MemoRepository): Result {
         return when (val result = repository.sync()) {
             is ApiResponse.Success -> {
                 try {

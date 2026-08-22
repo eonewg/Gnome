@@ -1,6 +1,7 @@
 package io.github.eonewg.gnome.core.model
 
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.data.local.entity.MemoWithResources
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Memo as RemoteMemo
 import io.github.eonewg.gnome.data.model.MemoVisibility as DataVisibility
@@ -77,6 +78,8 @@ fun MemoEntity.syncState(): SyncState = when {
     needsSync -> SyncState.PENDING_UPDATE
     else -> SyncState.SYNCED
 }
+
+fun MemoWithResources.toDomain(): Memo = memo.toDomain(resources)
 
 // ---------------------------------------------------------------------------
 // Remote snapshot → Domain

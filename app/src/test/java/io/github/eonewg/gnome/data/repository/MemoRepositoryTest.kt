@@ -3,7 +3,7 @@ package io.github.eonewg.gnome.data.repository
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class SyncingRepositoryTest {
+class MemoRepositoryTest {
     @Test
     fun mergesRemoteInstanceTagsWithOfflineTags() {
         assertEquals(

@@ -36,11 +36,10 @@ import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.model.UserSettings
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
-import io.github.eonewg.gnome.data.repository.LocalDatabaseRepository
 import io.github.eonewg.gnome.data.remote.memos.MemosV0RemoteDataSource
 import io.github.eonewg.gnome.data.remote.memos.MemosV1RemoteDataSource
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
-import io.github.eonewg.gnome.data.repository.SyncingRepository
+import io.github.eonewg.gnome.data.repository.MemoRepository
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.sync.SyncScheduler
@@ -121,10 +120,10 @@ class AccountService @Inject constructor(
     }
 
     @Volatile
-    private var repository: AbstractMemoRepository = LocalDatabaseRepository(
-        database.memoDao(),
+    private var repository: AbstractMemoRepository = MemoRepository(
+        localMemoDataSource(),
         fileStorage,
-        Account.Local(LocalAccount())
+        Account.Local(LocalAccount()),
     )
 
     @Volatile
@@ -150,45 +149,42 @@ class AccountService @Inject constructor(
     private fun updateCurrentAccount(account: Account?) {
         repository.close()
         when (account) {
-            null -> {
-                this.repository = LocalDatabaseRepository(database.memoDao(), fileStorage, Account.Local(LocalAccount()))
-                this.remoteRepository = null
-                httpClient = okHttpClient
-            }
-            is Account.Local -> {
-                this.repository = LocalDatabaseRepository(database.memoDao(), fileStorage, account)
+            null, is Account.Local -> {
+                this.repository = MemoRepository(localMemoDataSource(), fileStorage, account ?: Account.Local(LocalAccount()))
                 this.remoteRepository = null
                 httpClient = okHttpClient
             }
             is Account.MemosV0 -> {
                 val (client, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
                 val remote = MemosV0RemoteDataSource(memosApi, account)
-                this.repository = buildSyncingRepository(remote, account)
+                this.repository = buildMemoRepository(remote, account)
                 this.remoteRepository = remote
                 this.httpClient = client
             }
             is Account.MemosV1 -> {
                 val (client, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
                 val remote = MemosV1RemoteDataSource(memosApi, account)
-                this.repository = buildSyncingRepository(remote, account)
+                this.repository = buildMemoRepository(remote, account)
                 this.remoteRepository = remote
                 this.httpClient = client
             }
         }
     }
 
-    private fun buildSyncingRepository(remote: RemoteDataSource, account: Account): SyncingRepository {
-        val localData = LocalMemoDataSource(
+    private fun localMemoDataSource(): LocalMemoDataSource =
+        LocalMemoDataSource(
             database.memoDao(),
             database.syncOperationDao(),
             RoomTransactionRunner(database),
         )
-        return SyncingRepository(
-            localData,
+
+    private fun buildMemoRepository(remote: RemoteDataSource, account: Account): MemoRepository {
+        return MemoRepository(
+            localMemoDataSource(),
             fileStorage,
-            remote,
             account,
-            syncScheduler
+            syncScheduler,
+            remote,
         ) { user ->
             updateAccountFromSyncedUser(account.accountKey(), user)
         }
@@ -198,16 +194,16 @@ class AccountService @Inject constructor(
      * Resolves a syncing repository for any persisted remote account — the
      * foundation of SyncWorker's process recovery. The active account reuses
      * its live repository; other accounts are rebuilt on demand from the
-     * persisted config + token store + Room, with [SyncingRepositoryHandle.ownsLifecycle]
+     * persisted config + token store + Room, with [MemoRepositoryHandle.ownsLifecycle]
      * telling the caller to close the transient instance when done. Local-only
      * and unknown accounts return null (nothing to sync).
      */
-    suspend fun getSyncingRepository(accountKey: String): SyncingRepositoryHandle? {
+    suspend fun getSyncRepository(accountKey: String): MemoRepositoryHandle? {
         awaitInitialization()
         mutex.withLock {
             val active = repository
-            if (active is SyncingRepository && active.accountKeyValue == accountKey) {
-                return SyncingRepositoryHandle(active, ownsLifecycle = false)
+            if (active is MemoRepository && active.syncEnabled && active.accountKeyValue == accountKey) {
+                return MemoRepositoryHandle(active, ownsLifecycle = false)
             }
 
             val account = accounts.first().firstOrNull { it.accountKey() == accountKey }
@@ -215,15 +211,15 @@ class AccountService @Inject constructor(
             return when (account) {
                 is Account.MemosV0 -> {
                     val (_, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
-                    SyncingRepositoryHandle(
-                        buildSyncingRepository(MemosV0RemoteDataSource(memosApi, account), account),
+                    MemoRepositoryHandle(
+                        buildMemoRepository(MemosV0RemoteDataSource(memosApi, account), account),
                         ownsLifecycle = true,
                     )
                 }
                 is Account.MemosV1 -> {
                     val (_, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
-                    SyncingRepositoryHandle(
-                        buildSyncingRepository(MemosV1RemoteDataSource(memosApi, account), account),
+                    MemoRepositoryHandle(
+                        buildMemoRepository(MemosV1RemoteDataSource(memosApi, account), account),
                         ownsLifecycle = true,
                     )
                 }
@@ -232,9 +228,9 @@ class AccountService @Inject constructor(
         }
     }
 
-    data class SyncingRepositoryHandle(
-        val repository: SyncingRepository,
-        /** True when the caller owns the repository and must [SyncingRepository.close] it. */
+    data class MemoRepositoryHandle(
+        val repository: MemoRepository,
+        /** True when the caller owns the repository and must close it after use. */
         val ownsLifecycle: Boolean,
     )
 

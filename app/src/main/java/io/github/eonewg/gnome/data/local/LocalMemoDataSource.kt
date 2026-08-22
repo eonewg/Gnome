@@ -156,14 +156,19 @@ class LocalMemoDataSource(
     // User-intent mutations (transactional write + outbox enqueue)
     // -----------------------------------------------------------------------
 
-    /** Offline create: memo + attachments + MEMO UPSERT operation, atomic. */
-    suspend fun createLocalMemo(memo: MemoEntity, resources: List<ResourceEntity>) {
+    /**
+     * Offline create: memo + attachments (+ MEMO UPSERT operation), atomic.
+     * Local-only accounts pass sync=false and simply persist.
+     */
+    suspend fun createLocalMemo(memo: MemoEntity, resources: List<ResourceEntity>, sync: Boolean = true) {
         transactionRunner.inTransaction {
             memoDao.insertMemo(memo)
             resources.forEach { resource ->
                 memoDao.insertResource(resource.copy(accountKey = memo.accountKey, memoId = memo.identifier))
             }
-            enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memo.identifier)
+            if (sync) {
+                enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memo.identifier)
+            }
         }
     }
 
@@ -174,6 +179,7 @@ class LocalMemoDataSource(
     suspend fun updateLocalMemo(
         memo: MemoEntity,
         resources: List<ResourceEntity>?,
+        sync: Boolean = true,
     ): List<String> {
         val staleFiles = arrayListOf<String>()
         transactionRunner.inTransaction {
@@ -194,7 +200,9 @@ class LocalMemoDataSource(
                     )
                 }
             }
-            enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memo.identifier)
+            if (sync) {
+                enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memo.identifier)
+            }
         }
         return staleFiles
     }
@@ -207,35 +215,52 @@ class LocalMemoDataSource(
         }
     }
 
-    /** Archive or restore: flag + MEMO UPSERT operation. */
-    suspend fun setMemoArchived(memo: MemoEntity, archived: Boolean) {
+    /** Archive or restore: flag (+ MEMO UPSERT operation for sync accounts). */
+    suspend fun setMemoArchived(memo: MemoEntity, archived: Boolean, sync: Boolean = true) {
+        val now = Instant.now()
         transactionRunner.inTransaction {
-            memoDao.insertMemo(memo.copy(archived = archived, needsSync = true, lastModified = Instant.now()))
-            enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memo.identifier)
-        }
-    }
-
-    /** Resource attached to a memo on creation/edit: row + memo needsSync + MEMO UPSERT. */
-    suspend fun attachResourceToMemo(resource: ResourceEntity, memoId: String) {
-        transactionRunner.inTransaction {
-            memoDao.insertResource(resource)
-            memoDao.getMemoById(memoId, resource.accountKey)?.let { memo ->
-                memoDao.insertMemo(memo.copy(needsSync = true, lastModified = Instant.now()))
-            }
-            enqueueOperation(resource.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memoId)
-        }
-    }
-
-    /** Standalone upload (editor staging): row + ATTACHMENT UPSERT operation. */
-    suspend fun insertStandaloneResource(resource: ResourceEntity) {
-        transactionRunner.inTransaction {
-            memoDao.insertResource(resource)
-            enqueueOperation(
-                resource.accountKey,
-                SyncEntityType.ATTACHMENT,
-                SyncOperationType.UPSERT,
-                resource.identifier,
+            memoDao.insertMemo(
+                memo.copy(
+                    archived = archived,
+                    needsSync = sync,
+                    lastModified = now,
+                    lastSyncedAt = if (sync) memo.lastSyncedAt else now,
+                )
             )
+            if (sync) {
+                enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memo.identifier)
+            }
+        }
+    }
+
+    /**
+     * Resource attached to a memo on creation/edit: row + memo needsSync +
+     * MEMO UPSERT. Local-only accounts pass markDirty=false for a plain insert.
+     */
+    suspend fun attachResourceToMemo(resource: ResourceEntity, memoId: String, markDirty: Boolean = true) {
+        transactionRunner.inTransaction {
+            memoDao.insertResource(resource)
+            if (markDirty) {
+                memoDao.getMemoById(memoId, resource.accountKey)?.let { memo ->
+                    memoDao.insertMemo(memo.copy(needsSync = true, lastModified = Instant.now()))
+                }
+                enqueueOperation(resource.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memoId)
+            }
+        }
+    }
+
+    /** Standalone upload (editor staging): row (+ ATTACHMENT UPSERT for sync accounts). */
+    suspend fun insertStandaloneResource(resource: ResourceEntity, sync: Boolean = true) {
+        transactionRunner.inTransaction {
+            memoDao.insertResource(resource)
+            if (sync) {
+                enqueueOperation(
+                    resource.accountKey,
+                    SyncEntityType.ATTACHMENT,
+                    SyncOperationType.UPSERT,
+                    resource.identifier,
+                )
+            }
         }
     }
 
@@ -244,20 +269,20 @@ class LocalMemoDataSource(
      * enqueues the memo update before the attachment delete (reference
      * released first). Returns the stale local file URI, if any.
      */
-    suspend fun detachResource(resource: ResourceEntity): String? {
+    suspend fun detachResource(resource: ResourceEntity, sync: Boolean = true): String? {
         var staleFile: String? = null
         transactionRunner.inTransaction {
             staleFile = localFileUriOf(resource)
             memoDao.deleteResource(resource)
 
             val memoId = resource.memoId
-            if (!memoId.isNullOrBlank()) {
+            if (sync && !memoId.isNullOrBlank()) {
                 memoDao.getMemoById(memoId, resource.accountKey)?.let { memo ->
                     memoDao.insertMemo(memo.copy(needsSync = true, lastModified = Instant.now()))
                 }
                 enqueueOperation(resource.accountKey, SyncEntityType.MEMO, SyncOperationType.UPSERT, memoId)
             }
-            if (resource.remoteId != null) {
+            if (sync && resource.remoteId != null) {
                 enqueueOperation(
                     resource.accountKey,
                     SyncEntityType.ATTACHMENT,
