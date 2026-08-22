@@ -14,40 +14,44 @@
 - Deferred：CI 增加 push/PR 跑测试的 workflow（当前 CI 仅有 tag 触发的签名发布）。
 
 ### Phase 1 — Gnome identity（applicationId / namespace / package / branding）
-- In progress `applicationId` / `namespace` = `io.github.eonewg.gnome`。
-- In progress 源码包 `me.mudkip.moememos` → `io.github.eonewg.gnome`（main/test/androidTest 全量迁移）。
-- In progress 类重命名：`MoeMemosApp→GnomeApp`、`MoeMemosDatabase→GnomeDatabase`、
-  `MoeMemosTheme→GnomeTheme`、`MoeMemosDesign→GnomeDesign`、`MoeMemosTokens→GnomeTokens`、
-  `MoeMemosFileProvider→GnomeFileProvider`、`MoeMemosGlanceWidget→GnomeGlanceWidget`、
-  `MoeMemosGlanceWidgetReceiver→GnomeGlanceWidgetReceiver`、
-  `MeoMemosGlanceWidgetConfigurationActivity→GnomeGlanceWidgetConfigurationActivity`、
-  `MoeMemosException→GnomeException`。
-- In progress Manifest：`authorities/taskAffinity` 改用 `${applicationId}` 占位符；shortcuts.xml 指向新包。
-- In progress 数据库文件名 `moememos_database_localfirst` → `gnome.db`；SecureTokenStorage alias、
-  widget work name、glance widget info xml 同步去 Moe Memos 化。
-- In progress `settings.gradle` rootProject.name = Gnome；themes、fastlane 品牌文案修正。
-- In progress README / README.zh-CN 增加「新应用身份，fresh install + 重新登录同步」迁移说明。
+- **Done**（commit 1eaad649）`applicationId` / `namespace` = `io.github.eonewg.gnome`；
+  源码包 main/test/androidTest 全量迁移；类重命名（GnomeApp/GnomeDatabase/GnomeTheme/…）；
+  Manifest `${applicationId}` 占位符；数据库文件名 `gnome.db`；
+  `settings.gradle` rootProject.name = Gnome；README 双语「新应用身份」迁移说明。
 - 说明：applicationId 变更 = 新应用身份，旧 `me.mudkip.moememos` App 的本地数据不迁移
   （用户可并用或卸载）；本地账号（Local）数据不迁移，可用旧版导出 ZIP 后新版导入。
   此为文档化的正式迁移方案（提示词第六节允许）。
 
 ### Phase 2 — Domain Model
-- Next：`core/model` 下建立独立 domain 模型（Memo / Attachment / User / Account /
-  SyncState / MemoVisibility）与 Entity↔Domain mapper，先供 sync 层使用。
-- Deferred：UI 全面切换到 domain 模型（随 Phase 11/12 逐 feature 迁移）。
+- **Done**（commit b9e82596）`core/model`：Memo（本地稳定 id + remoteId）、Attachment、
+  MemoVisibility、SyncState（SYNCED / PENDING_CREATE / PENDING_UPDATE / PENDING_DELETE，
+  由 Room flags 推导）；mapper：MemoEntity/ResourceEntity ↔ Domain、远程快照 → Domain、
+  Visibility 双向桥接；MemoMapperTest 5 用例。
+- Deferred：UI 全面切换到 domain 模型（随 Phase 11/12 逐 feature 迁移；
+  Account/User 领域模型按需再迁）。
 
 ### Phase 3 — Local DataSource
-- Next：`data/local` 收敛为 LocalMemoDataSource（DAO + FileStorage + withTransaction），
-  多行写操作原子化。
+- **Done**（commit a8e64c36）`data/local/LocalMemoDataSource` 成为 memos/resources/
+  sync_operations 三表的唯一访问点：查询、SyncEngine 单行回写原语、带 outbox 的
+  用户意图复合事务写；文件删除以「返回待删 URI、事务外执行」的方式留在上层。
+  `TransactionRunner` 移至 data/local（RoomTransactionRunner 生产实现）；
+  `SyncFileStore` 改收 URI 字符串保持 engine JVM 可测；`fileUriToPath` 用
+  java.net.URI 解码（含 opaque 形式）。SyncEngine/SyncingRepository 全部改走 datasource。
 
 ### Phase 4 — Remote DataSource
-- Next：`MemosV0/V1Repository` 迁入 `data/remote/memos`（移动不改写），保持已验证的
-  分页 / updateMask / 流式上传 / resource name 解析实现。
+- **Done**（commit d86e5c60）`RemoteRepository` → `data/remote/RemoteDataSource`；
+  `MemosV0/V1Repository` → `data/remote/memos/MemosV0/V1RemoteDataSource`（git mv 保留历史，
+  纯移动不改写）；StreamingRequestBodies 随迁。分页 / updateMask / 流式上传 /
+  resource name 解析 / 鉴权 / 版本兼容逻辑未动，remote 层不感知 Room。
 
 ### Phase 5 — MemoRepository
-- Next：统一 UI 访问入口 `MemoRepository`（observeTimeline / create / update / delete /
-  archive / restore / setPinned），写后自动 `SyncScheduler.schedule`。
-  UI 不再感知 LocalDatabaseRepository / SyncingRepository。
+- **Done**（commit d3fa1a8d）`data/repository/MemoRepository` 取代 SyncingRepository 与
+  LocalDatabaseRepository（已删除），成为 AbstractMemoRepository 唯一实现：
+  远端账号 = LocalMemoDataSource 事务 + outbox + SyncScheduler + SyncEngine（手动同步
+  与 Worker 共用、互斥串行）；本地账号 = 纯持久化（无 outbox、deleteMemo 硬删，
+  保持 LocalDatabaseRepository 原语义）。新增 `observeTimeline(): Flow<List<core.model.Memo>>`
+  供 UI 渐进迁移。AccountService 双模式接线；worker 入口更名
+  getSyncRepository/MemoRepositoryHandle；移除死代码 provideLocalDatabaseRepository。
 
 ### Phase 6 — Room Outbox + Migration
 - **Done** `sync_operations` 表（id/accountKey/entityType/entityId/operation/payload/
@@ -79,12 +83,17 @@
   `database.withTransaction { 实体写入 + outbox 入队 }`，随后 `SyncScheduler.schedule`。
   手动"立即同步"（`sync()`）与 Worker 共用同一 SyncEngine，单一算法。
 - **Done** 账号移除时 purge outbox（`SyncOperationDao.deleteAllForAccount`）。
-- Deferred：非当前账号的后台同步（Worker 目前跳过非当前账号的 work，待 Phase 10
-  AccountService 拆分出 RemoteDataSourceFactory 后支持）。附件上传/删除链路的
-  端到端测试需真机（涉及本地文件与 Uri）。
+- **Done**（commit 10595cde，同步核心架构验收）：非当前账号的后台同步已支持——
+  `AccountService.getSyncRepository(accountKey)` 仅凭 accountKey + DataStore +
+  加密 Token + Room 现场重建一次性 repository，当前账号复用活实例（handle.ownsLifecycle
+  标记所有权，Worker 用毕 close）。
+- 附件上传/删除链路的端到端测试需真机（涉及本地文件与 Uri；JVM 侧已用 Robolectric
+  覆盖「先上传附件拿 remoteId 再被 memo 引用」的顺序测试）。
 
-### Phase 9 — 移除 SyncingRepository
-- Deferred（Phase 5/8 稳定、UI 全部经 MemoRepository 后执行）。
+### Phase 9 — 移除 AbstractMemoRepository 旧抽象
+- Partial：SyncingRepository / LocalDatabaseRepository 已随 Phase 5 删除；
+  剩余 AbstractMemoRepository 接口（entity 出参）待 UI 全部迁到 domain 模型
+  （observeTimeline）后移除，随 Phase 11/12 推进。
 
 ### Phase 10 — 拆分 AccountService
 - Deferred：AccountStore / TokenStore / AccountSession / MemosClientFactory /
@@ -123,6 +132,30 @@
 ### Phase 20 — 删除 Moe Memos 遗留命名与死代码
 - In progress（Phase 1 已完成代码级命名；fastlane 元数据等外围遗留随发版流程清理）。
 
+## 已完成：同步核心架构验收（2026-08-22，commit 10595cde）
+
+对 Outbox + SyncEngine + WorkManager 做了七项专项验收，全部落地：
+
+1. 调度竞态：policy 保持 APPEND_OR_REPLACE；`SyncScheduler.schedule` 对仍 ENQUEUED
+   的链去重（该 run 尚未读库、写已先落库，跳过安全；RUNNING/结束链照常 append），
+   避免突发写堆积全量 reconcile；`processOutbox` 改循环 drain（每轮重读表，
+   一轮零删除即停——卡住的 op 等下一次调度，不空转）；outbox 排序加 rowid 决胜，
+   REPLACE 合并后的 op 排到队尾。
+2. 幂等：唯一索引 + REPLACE + 「处理时读行终态」实现 coalescing；新增 7 个引擎测试
+   （10 次编辑合 1 op、update→delete 仅 1 次 delete、delete→restore 仅 1 次 update、
+   create→delete 零网络调用、drain 循环轮内重试、附件 404 幂等成功）。
+3. Worker 进程恢复：见 Phase 8 新增条目。
+4. 错误状态：`SyncRetryPolicy` 抽取 + 4 单测；改用原始 retrofit code
+   （`rawStatusCode()`）判定——sandwich 的 StatusCode 枚举对未映射码（507 等）会抛异常；
+   401 → accessTokenInvalid → Worker 终止不重试、outbox 保留（`auth failure parks the
+   outbox` 测试）；失败 op 持久化 lastError/attemptCount，成功才删除。
+5. 附件顺序：上传先于 memo push（Robolectric 顺序测试）；`detachResource` 改为
+   先入队 MEMO UPSERT（解除引用）再 ATTACHMENT DELETE。
+6. 事务纯度：三处事务内文件 IO 移出（engine.applyRemoteMemo、updateMemo、deleteResource），
+   崩溃窗口仅留孤儿文件。
+7. 状态来源：unsyncedCount 改由 `observeUnsyncedCount` Room Flow 派生；
+   syncing/errorMessage 保持进程内瞬态，持久失败明细在 outbox lastError/attemptCount。
+
 ## Known risks
 
 - applicationId 变更后，旧版本用户需手动安装新版并重新登录；本地（Local）账号数据无法
@@ -131,3 +164,6 @@
 - Migration test 为 androidTest，本机无模拟器时只能保证编译，需在有设备环境执行。
 - WorkManager 替换 fire-and-forget 后，后台同步时序变化需真机 smoke test
   （离线创建 → 杀进程 → 联网 → 自动同步）。
+- MemoRepository 编排层（依赖 FileStorage/SyncScheduler 具体类型）暂无 JVM 直测；
+  其各组成部分（datasource 事务语义、engine 同步算法）已有测试覆盖。可后补
+  Robolectric 测试（robolectric 已引入 testImplementation）。

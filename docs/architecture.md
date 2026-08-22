@@ -39,6 +39,12 @@ io.github.eonewg.gnome
 依赖方向：`feature → (repository / sync status) → (data.local / data.remote) / sync`。
 feature 不感知 MemosV0/V1、Room schema、Repository 实现细节。
 
+进度注记（2026-08-22）：`core/model`、`data/local/LocalMemoDataSource`、
+`data/remote(/memos)`、`data/repository/MemoRepository` 与 sync 层均已落地
+（Phase 2–8 + 同步核心验收完成），UI 仍通过 `AbstractMemoRepository` 的
+entity 接口访问，待 Phase 11/12 迁到 `observeTimeline()` 的 domain 模型。
+详见 [refactor-plan.md](refactor-plan.md)。
+
 ## 数据与同步模型
 
 ```text
