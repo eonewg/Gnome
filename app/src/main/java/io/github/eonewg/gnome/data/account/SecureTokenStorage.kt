@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.data.service
+package io.github.eonewg.gnome.data.account
 
 import android.content.Context
 import android.content.SharedPreferences

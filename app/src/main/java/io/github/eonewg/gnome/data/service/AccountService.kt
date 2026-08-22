@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import io.github.eonewg.gnome.R
+import io.github.eonewg.gnome.data.account.AccountStore
 import io.github.eonewg.gnome.data.account.MemosClientFactory
 import io.github.eonewg.gnome.data.account.RemoteDataSourceFactory
 import io.github.eonewg.gnome.data.api.MemosV0Api
@@ -34,11 +35,9 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.LocalAccount
 import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.data.model.UserData
-import io.github.eonewg.gnome.data.model.UserSettings
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.data.repository.MemoRepository
-import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.sync.SyncScheduler
 import net.swiftzer.semver.SemVer
@@ -59,8 +58,8 @@ class AccountService @Inject constructor(
     private val okHttpClient: OkHttpClient,
     private val database: GnomeDatabase,
     private val fileStorage: FileStorage,
-    private val secureTokenStorage: SecureTokenStorage,
     private val syncScheduler: SyncScheduler,
+    private val accountStore: AccountStore,
     private val memosClientFactory: MemosClientFactory,
     private val remoteDataSourceFactory: RemoteDataSourceFactory,
 ) {
@@ -99,14 +98,9 @@ class AccountService @Inject constructor(
     var httpClient: OkHttpClient = okHttpClient
         private set
 
-    val accounts = context.settingsDataStore.data.map { settings ->
-        settings.usersList.mapNotNull(::parseAccountWithSecureToken)
-    }
+    val accounts = accountStore.accounts
 
-    val currentAccount = context.settingsDataStore.data.map { settings ->
-        settings.usersList.firstOrNull { it.accountKey == settings.currentUser }
-            ?.let(::parseAccountWithSecureToken)
-    }
+    val currentAccount = accountStore.currentAccount
 
     @Volatile
     private var repository: AbstractMemoRepository = MemoRepository(
@@ -168,7 +162,7 @@ class AccountService @Inject constructor(
             syncScheduler,
             remote,
         ) { user ->
-            updateAccountFromSyncedUser(account.accountKey(), user)
+            accountStore.updateAccountUser(account.accountKey(), user)
         }
     }
 
@@ -212,31 +206,15 @@ class AccountService @Inject constructor(
     suspend fun switchAccount(accountKey: String) {
         awaitInitialization()
         mutex.withLock {
-            val account = accounts.first().firstOrNull { it.accountKey() == accountKey }
-            context.settingsDataStore.updateData { settings ->
-                settings.copy(currentUser = accountKey)
-            }
-            updateCurrentAccount(account)
+            accountStore.setCurrentAccountKey(accountKey)
+            updateCurrentAccount(accountStore.findAccount(accountKey))
         }
     }
 
     suspend fun addAccount(account: Account) {
         awaitInitialization()
         mutex.withLock {
-            persistAccessToken(account)
-            context.settingsDataStore.updateData { settings ->
-                val users = settings.usersList.toMutableList()
-                val index = users.indexOfFirst { it.accountKey == account.accountKey() }
-                val currentSettings = users.getOrNull(index)?.settings ?: UserSettings()
-                if (index != -1) {
-                    users.removeAt(index)
-                }
-                users.add(account.toPersistedUserData(currentSettings))
-                settings.copy(
-                    usersList = users,
-                    currentUser = account.accountKey(),
-                )
-            }
+            accountStore.addAccount(account)
             updateCurrentAccount(account)
         }
     }
@@ -244,25 +222,9 @@ class AccountService @Inject constructor(
     suspend fun removeAccount(accountKey: String) {
         awaitInitialization()
         mutex.withLock {
-            context.settingsDataStore.updateData { settings ->
-                val users = settings.usersList.toMutableList()
-                val index = users.indexOfFirst { it.accountKey == accountKey }
-                if (index != -1) {
-                    users.removeAt(index)
-                }
-                val newCurrentUser = if (settings.currentUser == accountKey) {
-                    users.firstOrNull()?.accountKey ?: ""
-                } else {
-                    settings.currentUser
-                }
-                settings.copy(
-                    usersList = users,
-                    currentUser = newCurrentUser,
-                )
-            }
-            updateCurrentAccount(currentAccount.first())
+            val newCurrentAccount = accountStore.removeAccount(accountKey)
+            updateCurrentAccount(newCurrentAccount)
             purgeAccountData(accountKey)
-            secureTokenStorage.removeToken(accountKey)
         }
     }
 
@@ -346,23 +308,6 @@ class AccountService @Inject constructor(
         fileStorage.deleteAccountFiles(accountKey)
     }
 
-    private suspend fun updateAccountFromSyncedUser(accountKey: String, user: User) {
-        mutex.withLock {
-            context.settingsDataStore.updateData { settings ->
-                val index = settings.usersList.indexOfFirst { it.accountKey == accountKey }
-                if (index == -1) {
-                    return@updateData settings
-                }
-                val existingUser = settings.usersList[index]
-                val current = parseAccountWithSecureToken(existingUser) ?: return@updateData settings
-                val updated = current.withUser(user)
-                val users = settings.usersList.toMutableList()
-                users[index] = updated.toPersistedUserData(existingUser.settings)
-                settings.copy(usersList = users)
-            }
-        }
-    }
-
     fun createMemosV0Client(host: String, accessToken: String?): Pair<OkHttpClient, MemosV0Api> {
         return memosClientFactory.createV0Client(host, accessToken)
     }
@@ -416,7 +361,7 @@ class AccountService @Inject constructor(
                 }
             }
             VersionPolicy.V1_HIGHER -> {
-                val accepted = isUnsupportedSyncVersionAccepted(account.accountKey(), serverVersion.version)
+                val accepted = accountStore.isUnsupportedSyncVersionAccepted(account.accountKey(), serverVersion.version)
                 if (isAutomatic) {
                     return if (accepted) {
                         SyncCompatibility.Allowed
@@ -441,21 +386,7 @@ class AccountService @Inject constructor(
     suspend fun rememberAcceptedUnsupportedSyncVersion(version: String) {
         awaitInitialization()
         val accountKey = currentAccount.first()?.accountKey() ?: return
-        mutex.withLock {
-            context.settingsDataStore.updateData { settings ->
-                val users = settings.usersList.toMutableList()
-                val index = users.indexOfFirst { it.accountKey == accountKey }
-                if (index == -1) {
-                    return@updateData settings
-                }
-                val user = users[index]
-                val versions = (user.settings.acceptedUnsupportedSyncVersions + version).distinct()
-                users[index] = user.copy(
-                    settings = user.settings.copy(acceptedUnsupportedSyncVersions = versions)
-                )
-                settings.copy(usersList = users)
-            }
-        }
+        accountStore.rememberAcceptedUnsupportedSyncVersion(accountKey, version)
     }
 
     suspend fun detectAccountCase(host: String): UserData.AccountCase {
@@ -495,7 +426,7 @@ class AccountService @Inject constructor(
     private suspend fun fetchVersionForAccount(account: Account): ServerVersionInfo? {
         return when (account) {
             is Account.MemosV0 -> {
-                val version = createMemosV0Client(account.info.host, account.info.accessToken)
+                val version = memosClientFactory.createV0Client(account.info.host, account.info.accessToken)
                     .second
                     .status()
                     .getOrNull()
@@ -506,7 +437,7 @@ class AccountService @Inject constructor(
                 if (version.isBlank()) null else ServerVersionInfo(UserData.AccountCase.MEMOS_V0, version)
             }
             is Account.MemosV1 -> {
-                val version = createMemosV1Client(account.info.host, account.info.accessToken)
+                val version = memosClientFactory.createV1Client(account.info.host, account.info.accessToken)
                     .second
                     .getProfile()
                     .getOrNull()
@@ -516,53 +447,6 @@ class AccountService @Inject constructor(
                 if (version.isBlank()) null else ServerVersionInfo(UserData.AccountCase.MEMOS_V1, version)
             }
             else -> null
-        }
-    }
-
-    private suspend fun isUnsupportedSyncVersionAccepted(accountKey: String, version: String): Boolean {
-        val userData = context.settingsDataStore.data.first()
-            .usersList
-            .firstOrNull { it.accountKey == accountKey }
-            ?: return false
-        return userData.settings.acceptedUnsupportedSyncVersions.contains(version)
-    }
-
-    private fun parseAccountWithSecureToken(userData: UserData): Account? {
-        val account = Account.parseUserData(userData) ?: return null
-        val token = secureTokenStorage.getToken(userData.accountKey)
-            .orEmpty()
-        return when (account) {
-            is Account.MemosV0 -> Account.MemosV0(account.info.copy(accessToken = token))
-            is Account.MemosV1 -> Account.MemosV1(account.info.copy(accessToken = token))
-            is Account.Local -> account
-        }
-    }
-
-    private fun Account.toPersistedUserData(settings: UserSettings): UserData {
-        return when (this) {
-            is Account.MemosV0 -> UserData(
-                settings = settings,
-                accountKey = accountKey(),
-                memosV0 = info.copy(accessToken = "")
-            )
-            is Account.MemosV1 -> UserData(
-                settings = settings,
-                accountKey = accountKey(),
-                memosV1 = info.copy(accessToken = "")
-            )
-            is Account.Local -> UserData(
-                settings = settings,
-                accountKey = accountKey(),
-                local = info
-            )
-        }
-    }
-
-    private fun persistAccessToken(account: Account) {
-        when (account) {
-            is Account.MemosV0 -> secureTokenStorage.saveToken(account.accountKey(), account.info.accessToken)
-            is Account.MemosV1 -> secureTokenStorage.saveToken(account.accountKey(), account.info.accessToken)
-            is Account.Local -> Unit
         }
     }
 
