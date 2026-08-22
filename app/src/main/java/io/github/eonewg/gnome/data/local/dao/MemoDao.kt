@@ -38,6 +38,9 @@ interface MemoDao {
     @Query("SELECT COUNT(*) FROM memos WHERE accountKey = :accountKey AND needsSync = 1")
     suspend fun countUnsyncedMemos(accountKey: String): Int
 
+    @Query("SELECT COUNT(*) FROM memos WHERE accountKey = :accountKey AND needsSync = 1")
+    fun observeUnsyncedCount(accountKey: String): Flow<Int>
+
     @Query("SELECT * FROM memos WHERE identifier = :identifier AND accountKey = :accountKey")
     suspend fun getMemoById(identifier: String, accountKey: String): MemoEntity?
 

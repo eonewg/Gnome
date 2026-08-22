@@ -1,6 +1,7 @@
 package io.github.eonewg.gnome.sync
 
 import com.skydoves.sandwich.ApiResponse
+import io.github.eonewg.gnome.data.constant.GnomeException
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
@@ -242,6 +243,157 @@ class SyncEngineTest {
         assertTrue(operationDao.operations.isEmpty())
     }
 
+    @Test
+    fun `burst of edits coalesces into one create with the final content`() = runBlocking {
+        memoDao.insertMemo(localMemo(identifier = "L1", content = "draft 10", needsSync = true))
+        repeat(10) { index ->
+            memoDao.insertMemo(
+                memoDao.memos.getValue("L1").copy(content = "draft ${index + 1}")
+            )
+            operationDao.enqueue(outbox("L1"))
+        }
+
+        assertEquals(1, operationDao.operations.size)
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Success)
+        assertEquals(listOf("draft 10"), remote.createdContents)
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
+    @Test
+    fun `update then delete ends as a single remote delete`() = runBlocking {
+        remote.memos["r1"] = remoteMemo("r1", "to be deleted", updatedAt = t1)
+        memoDao.insertMemo(
+            localMemo(
+                identifier = "L1",
+                remoteId = "r1",
+                content = "to be deleted",
+                needsSync = true,
+                isDeleted = true,
+                lastSyncedAt = t1,
+            )
+        )
+        operationDao.enqueue(outbox("L1"))
+        operationDao.enqueue(outbox("L1", operation = SyncOperationType.DELETE))
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Success)
+        assertEquals(listOf("r1"), remote.deletedMemoIds)
+        assertTrue(remote.updatedContents.isEmpty())
+        assertTrue(remote.createdContents.isEmpty())
+        assertNull(memoDao.memos["L1"])
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
+    @Test
+    fun `delete then restore ends as a single remote update`() = runBlocking {
+        remote.memos["r1"] = remoteMemo("r1", "original", updatedAt = t1)
+        memoDao.insertMemo(
+            localMemo(
+                identifier = "L1",
+                remoteId = "r1",
+                content = "restored edit",
+                needsSync = true,
+                lastSyncedAt = t1,
+            )
+        )
+        operationDao.enqueue(outbox("L1", operation = SyncOperationType.DELETE))
+        operationDao.enqueue(outbox("L1"))
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Success)
+        assertEquals(listOf("r1" to "restored edit"), remote.updatedContents)
+        assertTrue(remote.deletedMemoIds.isEmpty())
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
+    @Test
+    fun `create then delete before sync makes no server mutation calls`() = runBlocking {
+        memoDao.insertMemo(
+            localMemo(identifier = "L1", content = "abandoned", needsSync = true, isDeleted = true)
+        )
+        operationDao.enqueue(outbox("L1"))
+        operationDao.enqueue(outbox("L1", operation = SyncOperationType.DELETE))
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Success)
+        assertTrue(remote.createdContents.isEmpty())
+        assertTrue(remote.updatedContents.isEmpty())
+        assertTrue(remote.deletedMemoIds.isEmpty())
+        assertNull(memoDao.memos["L1"])
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
+    @Test
+    fun `drain loop retries within one run while other operations make progress`() = runBlocking {
+        memoDao.insertMemo(localMemo(identifier = "L1", content = "fine", needsSync = true))
+        memoDao.insertMemo(localMemo(identifier = "L2", content = "bad", needsSync = true))
+        remote.failingCreateContents.add("bad")
+        operationDao.enqueue(outbox("L2"))
+        operationDao.enqueue(outbox("L1"))
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Failure.Exception)
+        assertEquals(listOf("fine"), remote.createdContents)
+        assertTrue(memoDao.memos.getValue("L1").remoteId != null)
+        val stuck = operationDao.operations.values.single()
+        assertEquals("L2", stuck.entityId)
+        assertEquals(2, stuck.attemptCount)
+        assertTrue(stuck.lastError != null)
+
+        remote.failingCreateContents.clear()
+        val retry = engine.reconcile()
+        assertTrue(retry is ApiResponse.Success)
+        assertEquals(listOf("fine", "bad"), remote.createdContents)
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
+    @Test
+    fun `auth failure parks the outbox until the user re-authenticates`() = runBlocking {
+        remote.userResponse = ApiResponse.Failure.Error(
+            retrofit2.Response.error<User>(401, okhttp3.ResponseBody.create(null, ""))
+        )
+        memoDao.insertMemo(localMemo(identifier = "L1", content = "hello", needsSync = true))
+        operationDao.enqueue(outbox("L1"))
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Failure.Exception)
+        assertEquals(
+            GnomeException.accessTokenInvalid,
+            (result as ApiResponse.Failure.Exception).throwable,
+        )
+        assertTrue(remote.createdContents.isEmpty())
+        val parked = operationDao.operations.values.single()
+        assertEquals(0, parked.attemptCount)
+
+        remote.userResponse = null
+        val retry = engine.reconcile()
+        assertTrue(retry is ApiResponse.Success)
+        assertEquals(listOf("hello"), remote.createdContents)
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
+    @Test
+    fun `attachment delete treats 404 as success`() = runBlocking {
+        remote.missingResourceIds.add("att-gone")
+        operationDao.enqueue(
+            outbox("res-1", type = SyncEntityType.ATTACHMENT, operation = SyncOperationType.DELETE, payload = "att-gone")
+        )
+
+        val result = engine.reconcile()
+
+        assertTrue(result is ApiResponse.Success)
+        assertTrue(remote.deletedResourceIds.isEmpty())
+        assertTrue(operationDao.operations.isEmpty())
+    }
+
     private fun localMemo(
         identifier: String,
         remoteId: String? = null,
@@ -295,6 +447,9 @@ class FakeMemoDao : MemoDao {
 
     override suspend fun countUnsyncedMemos(accountKey: String): Int =
         memos.values.count { it.accountKey == accountKey && it.needsSync }
+
+    override fun observeUnsyncedCount(accountKey: String): Flow<Int> =
+        flowOf(memos.values.count { it.accountKey == accountKey && it.needsSync })
 
     override suspend fun getMemoById(identifier: String, accountKey: String): MemoEntity? =
         memos[identifier]?.takeIf { it.accountKey == accountKey }
@@ -382,6 +537,18 @@ class FakeRemoteRepository : RemoteRepository() {
     val deletedResourceIds = mutableListOf<String>()
     val failingOperations = mutableSetOf<String>()
 
+    /** Memo contents whose create fails while everything else succeeds. */
+    val failingCreateContents = mutableSetOf<String>()
+
+    /** Remote ids whose delete returns 404 (already gone on the server). */
+    val missingResourceIds = mutableSetOf<String>()
+
+    /** Overrides the user endpoint; defaults to a success when null. */
+    var userResponse: ApiResponse<User>? = null
+
+    /** Names of mutating calls in execution order, e.g. "createResource". */
+    val callLog = mutableListOf<String>()
+
     private var nextId = 0
 
     private fun shouldFail(name: String): Boolean = name in failingOperations
@@ -402,7 +569,8 @@ class FakeRemoteRepository : RemoteRepository() {
         tags: List<String>?,
         createdAt: Instant?,
     ): ApiResponse<Memo> {
-        if (shouldFail("createMemo")) {
+        callLog.add("createMemo")
+        if (shouldFail("createMemo") || content in failingCreateContents) {
             return ApiResponse.Failure.Exception(IOException("network down"))
         }
         val remoteId = "r-${nextId++}"
@@ -431,6 +599,7 @@ class FakeRemoteRepository : RemoteRepository() {
         pinned: Boolean?,
         archived: Boolean?,
     ): ApiResponse<Memo> {
+        callLog.add("updateMemo")
         if (shouldFail("updateMemo")) {
             return ApiResponse.Failure.Exception(IOException("network down"))
         }
@@ -449,6 +618,7 @@ class FakeRemoteRepository : RemoteRepository() {
     }
 
     override suspend fun deleteMemo(remoteId: String): ApiResponse<Unit> {
+        callLog.add("deleteMemo")
         if (shouldFail("deleteMemo")) {
             return ApiResponse.Failure.Exception(IOException("network down"))
         }
@@ -468,6 +638,7 @@ class FakeRemoteRepository : RemoteRepository() {
         openInputStream: () -> InputStream,
         memoRemoteId: String?,
     ): ApiResponse<Resource> {
+        callLog.add("createResource")
         if (shouldFail("createResource")) {
             return ApiResponse.Failure.Exception(IOException("network down"))
         }
@@ -475,6 +646,12 @@ class FakeRemoteRepository : RemoteRepository() {
     }
 
     override suspend fun deleteResource(remoteId: String): ApiResponse<Unit> {
+        callLog.add("deleteResource")
+        if (remoteId in missingResourceIds) {
+            return ApiResponse.Failure.Error(
+                retrofit2.Response.error<Unit>(404, okhttp3.ResponseBody.create(null, ""))
+            )
+        }
         if (shouldFail("deleteResource")) {
             return ApiResponse.Failure.Exception(IOException("network down"))
         }
@@ -483,7 +660,7 @@ class FakeRemoteRepository : RemoteRepository() {
     }
 
     override suspend fun getCurrentUser(): ApiResponse<User> =
-        ApiResponse.Success(User(identifier = "u1", name = "Tester"))
+        userResponse ?: ApiResponse.Success(User(identifier = "u1", name = "Tester"))
 
     private fun remoteResource(remoteId: String) = Resource(
         remoteId = remoteId,

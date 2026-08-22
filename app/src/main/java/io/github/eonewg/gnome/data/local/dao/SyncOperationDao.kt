@@ -18,10 +18,15 @@ interface SyncOperationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun enqueue(operation: SyncOperationEntity)
 
-    @Query("SELECT * FROM sync_operations WHERE accountKey = :accountKey ORDER BY createdAt ASC")
+    /**
+     * `rowid` breaks same-millisecond ties in insertion order; REPLACE also
+     * assigns a fresh rowid, so a coalesced re-enqueue moves to the back of
+     * the queue, matching its renewed intent.
+     */
+    @Query("SELECT * FROM sync_operations WHERE accountKey = :accountKey ORDER BY createdAt ASC, rowid ASC")
     suspend fun getOperations(accountKey: String): List<SyncOperationEntity>
 
-    @Query("SELECT * FROM sync_operations WHERE accountKey = :accountKey ORDER BY createdAt ASC")
+    @Query("SELECT * FROM sync_operations WHERE accountKey = :accountKey ORDER BY createdAt ASC, rowid ASC")
     fun observeOperations(accountKey: String): Flow<List<SyncOperationEntity>>
 
     @Query("SELECT COUNT(*) FROM sync_operations WHERE accountKey = :accountKey")

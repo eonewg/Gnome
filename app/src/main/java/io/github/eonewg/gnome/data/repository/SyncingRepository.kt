@@ -81,14 +81,18 @@ class SyncingRepository(
 
     private val operationMutex = Mutex()
 
-    // Local-only scope: the initial unsynced-count read. Never launches network work.
+    // Local-only scope: derives the pending indicator from Room so every write
+    // path (including SyncEngine's) is reflected without manual bookkeeping.
+    // Never launches network work.
     private val statusScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _syncStatus = MutableStateFlow(SyncStatus())
     override val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
 
     init {
         statusScope.launch {
-            refreshUnsyncedCount()
+            memoDao.observeUnsyncedCount(accountKeyValue).collect { count ->
+                _syncStatus.update { it.copy(unsyncedCount = count) }
+            }
         }
     }
 
@@ -179,6 +183,9 @@ class SyncingRepository(
                 isDeleted = false,
                 lastModified = Instant.now()
             )
+            // File deletions run after the transaction: Room transactions must
+            // stay free of file IO. A crash in between only leaves an orphan file.
+            val staleLocalFiles = arrayListOf<Uri>()
             database.withTransaction {
                 memoDao.insertMemo(updatedMemo)
 
@@ -187,7 +194,7 @@ class SyncingRepository(
                     val incomingIds = resources.mapTo(hashSetOf()) { it.identifier }
                     existingResources.forEach { existing ->
                         if (existing.identifier !in incomingIds) {
-                            deleteLocalFile(existing)
+                            localFileUriOf(existing)?.let(staleLocalFiles::add)
                             memoDao.deleteResource(existing)
                         }
                     }
@@ -202,6 +209,7 @@ class SyncingRepository(
                 }
                 enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, updatedMemo.identifier)
             }
+            staleLocalFiles.forEach(fileStorage::deleteFile)
             afterLocalWrite()
             ApiResponse.Success(withResources(updatedMemo))
         } catch (e: Exception) {
@@ -358,8 +366,12 @@ class SyncingRepository(
                 ?: return ApiResponse.Failure.Exception(Exception("Resource not found"))
 
             val memoId = resource.memoId
+            // Enqueue order matters: the memo update that drops the reference is
+            // queued before the attachment delete, so the server never sees a
+            // memo pointing at a removed attachment (or vice versa for longer
+            // than one operation). File deletion runs after the transaction:
+            // Room transactions must stay free of file IO.
             database.withTransaction {
-                deleteLocalFile(resource)
                 memoDao.deleteResource(resource)
 
                 if (!memoId.isNullOrBlank()) {
@@ -371,6 +383,7 @@ class SyncingRepository(
                             )
                         )
                     }
+                    enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, memoId)
                 }
                 if (resource.remoteId != null) {
                     enqueueOutbox(
@@ -380,10 +393,8 @@ class SyncingRepository(
                         payload = resource.remoteId
                     )
                 }
-                if (!memoId.isNullOrBlank()) {
-                    enqueueOutbox(SyncEntityType.MEMO, SyncOperationType.UPSERT, memoId)
-                }
             }
+            localFileUriOf(resource)?.let(fileStorage::deleteFile)
             afterLocalWrite()
             ApiResponse.Success(Unit)
         } catch (e: Exception) {
@@ -451,12 +462,10 @@ class SyncingRepository(
                     } else {
                         setSyncError(result.getErrorMessage())
                     }
-                    refreshUnsyncedCount()
                     result
                 } catch (e: Throwable) {
                     val failure = ApiResponse.Failure.Exception(e)
                     setSyncError(failure.getErrorMessage())
-                    refreshUnsyncedCount()
                     failure
                 } finally {
                     setSyncing(false)
@@ -466,7 +475,6 @@ class SyncingRepository(
     }
 
     private suspend fun afterLocalWrite() {
-        refreshUnsyncedCount()
         syncScheduler.schedule(accountKeyValue)
     }
 
@@ -489,11 +497,6 @@ class SyncingRepository(
         )
     }
 
-    private suspend fun refreshUnsyncedCount() {
-        val count = memoDao.countUnsyncedMemos(accountKeyValue)
-        _syncStatus.update { it.copy(unsyncedCount = count) }
-    }
-
     private fun setSyncing(syncing: Boolean) {
         _syncStatus.update { it.copy(syncing = syncing) }
     }
@@ -513,12 +516,9 @@ class SyncingRepository(
         return if (uri.scheme == "file" && File(uri.path ?: "").exists()) uri else null
     }
 
-    private fun deleteLocalFile(resource: ResourceEntity) {
-        val uri = resource.localUri?.toUri()
+    private fun localFileUriOf(resource: ResourceEntity): Uri? {
+        return resource.localUri?.toUri()
             ?: resource.uri.toUri().takeIf { it.scheme == "file" }
-        if (uri != null) {
-            fileStorage.deleteFile(uri)
-        }
     }
 
     override fun close() {

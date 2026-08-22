@@ -6,9 +6,11 @@ import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,8 +25,28 @@ import javax.inject.Singleton
 class SyncScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    fun schedule(accountKey: String) {
-        WorkManager.getInstance(context).enqueueUniqueWork(
+    /**
+     * APPEND_OR_REPLACE is what makes the write→schedule race safe: a run that
+     * is already executing may have read the outbox before this write, so its
+     * chain always gets one more run appended. The only case that can be
+     * skipped is a chain still sitting in ENQUEUED — that worker has not read
+     * anything yet, and this write was committed to Room before we looked, so
+     * the queued run is guaranteed to observe it. Skipping keeps a burst of
+     * writes from queueing a full reconcile per edit.
+     */
+    suspend fun schedule(accountKey: String) {
+        val workManager = WorkManager.getInstance(context)
+        val alreadyQueued = try {
+            workManager.getWorkInfosForUniqueWorkFlow(uniqueWorkName(accountKey))
+                .first()
+                .any { it.state == WorkInfo.State.ENQUEUED }
+        } catch (_: Throwable) {
+            false
+        }
+
+        if (alreadyQueued) return
+
+        workManager.enqueueUniqueWork(
             uniqueWorkName(accountKey),
             ExistingWorkPolicy.APPEND_OR_REPLACE,
             buildRequest(accountKey)

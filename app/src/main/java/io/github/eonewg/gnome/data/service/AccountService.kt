@@ -161,39 +161,77 @@ class AccountService @Inject constructor(
             is Account.MemosV0 -> {
                 val (client, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
                 val remote = MemosV0Repository(memosApi, account)
-                this.repository = SyncingRepository(
-                    database,
-                    database.memoDao(),
-                    database.syncOperationDao(),
-                    fileStorage,
-                    remote,
-                    account,
-                    syncScheduler
-                ) { user ->
-                    updateAccountFromSyncedUser(account.accountKey(), user)
-                }
+                this.repository = buildSyncingRepository(remote, account)
                 this.remoteRepository = remote
                 this.httpClient = client
             }
             is Account.MemosV1 -> {
                 val (client, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
                 val remote = MemosV1Repository(memosApi, account)
-                this.repository = SyncingRepository(
-                    database,
-                    database.memoDao(),
-                    database.syncOperationDao(),
-                    fileStorage,
-                    remote,
-                    account,
-                    syncScheduler
-                ) { user ->
-                    updateAccountFromSyncedUser(account.accountKey(), user)
-                }
+                this.repository = buildSyncingRepository(remote, account)
                 this.remoteRepository = remote
                 this.httpClient = client
             }
         }
     }
+
+    private fun buildSyncingRepository(remote: RemoteRepository, account: Account): SyncingRepository {
+        return SyncingRepository(
+            database,
+            database.memoDao(),
+            database.syncOperationDao(),
+            fileStorage,
+            remote,
+            account,
+            syncScheduler
+        ) { user ->
+            updateAccountFromSyncedUser(account.accountKey(), user)
+        }
+    }
+
+    /**
+     * Resolves a syncing repository for any persisted remote account — the
+     * foundation of SyncWorker's process recovery. The active account reuses
+     * its live repository; other accounts are rebuilt on demand from the
+     * persisted config + token store + Room, with [SyncingRepositoryHandle.ownsLifecycle]
+     * telling the caller to close the transient instance when done. Local-only
+     * and unknown accounts return null (nothing to sync).
+     */
+    suspend fun getSyncingRepository(accountKey: String): SyncingRepositoryHandle? {
+        awaitInitialization()
+        mutex.withLock {
+            val active = repository
+            if (active is SyncingRepository && active.accountKeyValue == accountKey) {
+                return SyncingRepositoryHandle(active, ownsLifecycle = false)
+            }
+
+            val account = accounts.first().firstOrNull { it.accountKey() == accountKey }
+                ?: return null
+            return when (account) {
+                is Account.MemosV0 -> {
+                    val (_, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
+                    SyncingRepositoryHandle(
+                        buildSyncingRepository(MemosV0Repository(memosApi, account), account),
+                        ownsLifecycle = true,
+                    )
+                }
+                is Account.MemosV1 -> {
+                    val (_, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
+                    SyncingRepositoryHandle(
+                        buildSyncingRepository(MemosV1Repository(memosApi, account), account),
+                        ownsLifecycle = true,
+                    )
+                }
+                is Account.Local -> null
+            }
+        }
+    }
+
+    data class SyncingRepositoryHandle(
+        val repository: SyncingRepository,
+        /** True when the caller owns the repository and must [SyncingRepository.close] it. */
+        val ownsLifecycle: Boolean,
+    )
 
     suspend fun switchAccount(accountKey: String) {
         awaitInitialization()

@@ -3,9 +3,7 @@ package io.github.eonewg.gnome.sync
 import android.net.Uri
 import androidx.core.net.toUri
 import com.skydoves.sandwich.ApiResponse
-import com.skydoves.sandwich.StatusCode
 import com.skydoves.sandwich.getOrNull
-import com.skydoves.sandwich.retrofit.statusCode
 import io.github.eonewg.gnome.data.constant.GnomeException
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
@@ -181,28 +179,38 @@ class SyncEngine(
     /**
      * Drains the durable outbox. Memo operations converge on the row's latest
      * state, so they are safe to process in any order and after any reconcile.
+     * Rounds re-read the table so operations enqueued mid-drain are picked up;
+     * a round that deletes nothing means the remainder is stuck (e.g. offline)
+     * and waits for the next scheduled run instead of spinning.
      * Returns the first error message, or null when everything succeeded.
      */
     suspend fun processOutbox(): String? {
-        val operations = syncOperationDao.getOperations(accountKey)
         var firstError: String? = null
 
-        for (operation in operations) {
-            val opError = try {
-                processOperation(operation)
-            } catch (e: Throwable) {
-                e.message ?: e.javaClass.simpleName
+        while (true) {
+            val operations = syncOperationDao.getOperations(accountKey)
+            if (operations.isEmpty()) break
+
+            var deletedThisRound = 0
+            for (operation in operations) {
+                val opError = try {
+                    processOperation(operation)
+                } catch (e: Throwable) {
+                    e.message ?: e.javaClass.simpleName
+                }
+                if (opError == null) {
+                    syncOperationDao.delete(operation.id)
+                    deletedThisRound += 1
+                } else {
+                    firstError = firstError ?: opError
+                    syncOperationDao.enqueue(operation.copy(
+                        attemptCount = operation.attemptCount + 1,
+                        lastAttemptAt = Instant.now(),
+                        lastError = opError,
+                    ))
+                }
             }
-            if (opError == null) {
-                syncOperationDao.delete(operation.id)
-            } else {
-                firstError = firstError ?: opError
-                syncOperationDao.enqueue(operation.copy(
-                    attemptCount = operation.attemptCount + 1,
-                    lastAttemptAt = Instant.now(),
-                    lastError = opError,
-                ))
-            }
+            if (deletedThisRound == 0) break
         }
         return firstError
     }
@@ -241,7 +249,7 @@ class SyncEngine(
                 val deleted = remoteRepository.deleteResource(remoteId)
                 when {
                     deleted is ApiResponse.Success -> null
-                    deleted is ApiResponse.Failure.Error && deleted.statusCode == StatusCode.NotFound -> null
+                    deleted is ApiResponse.Failure.Error && deleted.rawStatusCode() == 404 -> null
                     else -> deleted.getErrorMessage()
                 }
             }
@@ -270,7 +278,8 @@ class SyncEngine(
                 }
             }
             is ApiResponse.Failure.Error -> {
-                if (remoteUser.statusCode == StatusCode.Forbidden || remoteUser.statusCode == StatusCode.Unauthorized) {
+                val code = remoteUser.rawStatusCode()
+                if (code == 401 || code == 403) {
                     ApiResponse.Failure.Exception(GnomeException.accessTokenInvalid)
                 } else {
                     remoteUser.mapFailureToUnit()
@@ -449,6 +458,10 @@ class SyncEngine(
         val localIdentifier = current?.identifier ?: UUID.randomUUID().toString()
         val remoteUpdatedAt = remoteMemo.updatedAt ?: remoteMemo.date
 
+        // File deletions run after the transaction: Room transactions must stay
+        // free of file IO. A crash in between only leaves an orphan file.
+        val staleLocalFiles = arrayListOf<Uri>()
+
         transactionRunner.inTransaction {
             memoDao.insertMemo(
                 MemoEntity(
@@ -471,7 +484,7 @@ class SyncEngine(
             val remoteResourceIds = remoteMemo.resources.mapTo(hashSetOf()) { remoteResourceId(it) }
             currentResources.forEach { currentResource ->
                 if (currentResource.remoteId !in remoteResourceIds) {
-                    deleteLocalFile(currentResource)
+                    localFileUriOf(currentResource)?.let(staleLocalFiles::add)
                     memoDao.deleteResource(currentResource)
                 }
             }
@@ -501,6 +514,8 @@ class SyncEngine(
                 )
             }
         }
+
+        staleLocalFiles.forEach(fileStore::deleteFile)
     }
 
     private suspend fun markSynced(local: MemoEntity, remoteMemo: Memo) {
@@ -536,12 +551,13 @@ class SyncEngine(
         }
     }
 
-    private fun deleteLocalFile(resource: ResourceEntity) {
-        val uri = resource.localUri?.toUri()
+    private fun localFileUriOf(resource: ResourceEntity): Uri? {
+        return resource.localUri?.toUri()
             ?: resource.uri.toUri().takeIf { it.scheme == "file" }
-        if (uri != null) {
-            fileStore.deleteFile(uri)
-        }
+    }
+
+    private fun deleteLocalFile(resource: ResourceEntity) {
+        localFileUriOf(resource)?.let(fileStore::deleteFile)
     }
 
     private fun remoteMemoId(memo: Memo): String {

@@ -5,26 +5,25 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.skydoves.sandwich.ApiResponse
-import com.skydoves.sandwich.StatusCode
-import com.skydoves.sandwich.retrofit.statusCode
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import io.github.eonewg.gnome.data.constant.GnomeException
 import io.github.eonewg.gnome.data.repository.SyncingRepository
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.widget.WidgetUpdateScheduler
-import java.io.IOException
 
 /**
  * Executes one full SyncEngine reconcile for an account. Persisted by
  * WorkManager, so pending outbox work survives process death and retries with
  * backoff on transient network failures.
  *
- * Only the currently active account is synchronized (matching the app's
- * single-active-repository model); outbox rows of other accounts drain when
- * their account becomes active again.
+ * Process recovery: the account is rebuilt purely from persisted state — the
+ * accountKey input, DataStore account config, the encrypted token store and
+ * Room. Nothing from a previous Activity session or an in-memory repository
+ * is required. The active account reuses its live repository (so its mutex
+ * and status updates apply); other accounts get a transient repository that
+ * is closed after the run. Local-only and unknown accounts are skipped.
  */
 class SyncWorker(
     appContext: Context,
@@ -40,16 +39,26 @@ class SyncWorker(
             SyncWorkerEntryPoint::class.java
         ).accountService()
 
-        val repository = try {
-            accountService.getRepository()
+        val handle = try {
+            accountService.getSyncingRepository(accountKey) ?: return Result.success()
         } catch (e: Throwable) {
-            return if (isRetryable(e)) Result.retry() else Result.failure(errorData(e.message))
+            return if (SyncRetryPolicy.isRetryable(e)) {
+                Result.retry()
+            } else {
+                Result.failure(errorData(e.message))
+            }
         }
 
-        if (repository !is SyncingRepository || repository.accountKeyValue != accountKey) {
-            return Result.success()
+        return try {
+            executeSync(handle.repository)
+        } finally {
+            if (handle.ownsLifecycle) {
+                handle.repository.close()
+            }
         }
+    }
 
+    private suspend fun executeSync(repository: SyncingRepository): Result {
         return when (val result = repository.sync()) {
             is ApiResponse.Success -> {
                 try {
@@ -59,32 +68,23 @@ class SyncWorker(
                 }
                 Result.success()
             }
-            is ApiResponse.Failure.Error ->
-                if (isRetryableStatus(result.statusCode)) {
+            is ApiResponse.Failure.Error -> {
+                val code = result.rawStatusCode()
+                if (code != null && SyncRetryPolicy.isRetryableStatusCode(code)) {
                     Result.retry()
                 } else {
-                    Result.failure(errorData(result.statusCode.toString()))
+                    Result.failure(errorData(code?.toString() ?: "unknown"))
                 }
+            }
             is ApiResponse.Failure.Exception -> {
                 val throwable = result.throwable
-                if (isRetryable(throwable)) Result.retry()
+                if (SyncRetryPolicy.isRetryable(throwable)) Result.retry()
                 else Result.failure(errorData(throwable.message))
             }
         }
     }
 
     private fun errorData(message: String?) = workDataOf(KEY_ERROR to (message ?: "unknown"))
-
-    private fun isRetryable(throwable: Throwable): Boolean {
-        if (throwable is GnomeException) return false
-        return throwable is IOException
-    }
-
-    private fun isRetryableStatus(statusCode: StatusCode): Boolean {
-        return statusCode == StatusCode.RequestTimeout ||
-            statusCode == StatusCode.TooManyRequests ||
-            statusCode.code in 500..599
-    }
 
     companion object {
         const val KEY_ACCOUNT_KEY = "accountKey"
