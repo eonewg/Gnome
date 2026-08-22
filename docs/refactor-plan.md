@@ -360,8 +360,81 @@
     零残留。仍未覆盖的真机项：Tile 点击 → 编辑器路径、账号切换后 widget 刷新、
     Share 旋转恢复、附录（widget 刷新链路依赖 Glance manager 与进程存活）。
 
-### Phase 19 — 性能 / Baseline Profile / 回归
-- Deferred。
+### Phase 19 — 性能 / Baseline Profile / 回归（2026-08-22，真机验收）
+
+审计结论（不依赖设备的全部完成）：
+
+- 全仓库 grep（Moe/MoeMemos/moememos/me.mudkip/AbstractMemoRepository/MemoRepresentable/
+  ResourceRepresentable/NavController/navigation-compose/GlobalScope/TODO/FIXME）：代码零命中，
+  残留仅限文档（GPL 致谢、重构历史），分类 A/C 保留；`data.model.Memo/Resource` 仅存在于
+  data/remote、sync、core mapper（合法 wire DTO，分类 B）；feature/explore 的 wire 映射
+  是文档化的边界 seam（分类 D），UI 只接触 ExploreMemo，不算泄漏（分类 E/F 无）。
+- 依赖方向：feature/ui/widget 无 data.local.entity/DAO/RoomDatabase/Retrofit 导入；
+  core 无 feature/Room/Retrofit/Compose 导入；widget 无 Entity/DTO。
+- MemoTableChangeWatcher：`@Singleton` + `GnomeApp.onCreate().start()`，任何创建进程的入口
+  （Widget/Tile/QuickMemoActivity/MainActivity/Worker）都必注册，进程内只注册一次；
+  Room invalidation（memos/resources）→ 2s 合并窗口 → updateAllWidgets；账号切换由
+  WidgetAccountRefreshListener 单独覆盖（观察者不依赖页面打开，冷进程有效）。
+- Room 索引：热路径均有索引覆盖（memos.accountKey、(accountKey,remoteId)；
+  memo_tags(accountKey,tag)；sync_operations 唯一索引 + accountKey；
+  resources(memoId)、accountKey 等）；search 的 LIKE 前导通配无法建索引（已注释）；
+  不需要补索引。
+- Compose：LazyColumn 均带 key/contentType（ExploreList 无 key 但为无状态分页，
+  非明确问题）；Markdown 只在 tag 解析时 parse，无重复渲染；无明确问题，不优化。
+- Baseline Profile：app/src/main/baseline-prof.txt 存在且已包名更新；删除 4 条指向
+  已删除类的陈旧规则（MemoInputPageKt/UserStateViewModel/MemosViewModel/MemoInputViewModel）。
+- 安全审计：git ls-files 无 jks/keystore/local.properties/凭据；`icon/Gnome.png` 为未跟踪
+  图标资产；migration/artifacts 等忽略规则齐全。
+- WidgetUpdater 旧手动调度已清零；未发现需修复的产品 bug（Phase 19 内无 bug fix commit）。
+
+真机回归（USB，正式验收环境）：
+
+```text
+Real device
+Manufacturer: OnePlus
+Model: PJD110
+Android: 16
+API: 36
+
+Unit tests: 164 PASS
+Instrumentation tests: 5 (3 PASS, 2 SKIP)
+
+Smoke:
+Timeline: PASS — 本地账户创建后写 1 条 memo，立即出现（22:02）
+Offline create: PASS — 本地账户即离线场景，无网络依赖创建成功
+Process death sync: PARTIAL — am crash 后冷启动（640ms）数据完整；
+  shell kill PID 被设备拒绝（Operation not permitted），真实进程回收待手动验证
+Edit: NOT TESTED
+Delete: NOT TESTED
+Attachment: NOT TESTED
+Conflict: NOT TESTED — 无 Memos server 凭据/第二客户端
+Quick Settings Tile: NOT TESTED — 未添加到系统 QS（不擅自改用户布局）；
+  无账号回退路径已由 instrumentation skip 场景 + 手动引导页验证
+Share text: PASS — 预填 singleTask onNewIntent 正确；取消不创建 memo；
+  Discard 对话框丢弃草稿
+Share image: NOT TESTED — 未向用户设备注入媒体文件
+Widget: NOT TESTED — 桌面添加 widget 需手动
+Navigation 3: PARTIAL — 登录/引导、主界面、编辑器、Share 导航正常；
+  未覆盖全量页面跳转
+
+Performance:
+Cold launch: 810ms / 668ms / 629ms (TotalTime, 3 次)
+Warm launch: 63ms
+Tile → Editor: NOT TESTED
+
+Known issues: 
+- ColorOS（PJD110）安装守护弹窗拦截 adb/gradle 静默安装 test APK，
+  connectedDebugAndroidTest 期间会弹"来自电脑端未知来源"确认框（设备环境，非 app bug）
+- AGP connected 测试会卸载并重装 target APK（清空数据）——每次测试后应用从桌面
+  暂时消失，需重新登录；测试过程中避免与用户使用冲突
+- 设备 shell 不允许 kill PID，进程死亡自动化受限（用 am crash 代替）
+Deferred:
+- Tile/Widget/Share image 手动验收（需用户操作 QS/桌面/相册）
+- 服务器同步链路（离线创建→杀进程→联网→WorkManager→Memos Server）需真实
+  Memos server 凭据
+- 重启设备 Case 4；Baseline Profile 的 Macrobenchmark 量化（现状有 prof 无 benchmark 模块）
+- 新增 androidTest QuickMemoActivityTest（冷启动 + recreate）：无账号环境自动 SKIP
+  （宿主按设计回退 MainActivity），有账号设备上会真正断言 editor 出现
 
 ### Phase 20 — 删除 Moe Memos 遗留命名与死代码
 - In progress（Phase 1 已完成代码级命名；fastlane 元数据等外围遗留随发版流程清理）。
