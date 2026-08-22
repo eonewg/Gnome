@@ -24,9 +24,13 @@ import androidx.window.core.layout.WindowSizeClass
 import kotlinx.coroutines.launch
 import me.mudkip.moememos.ui.component.SideDrawer
 import me.mudkip.moememos.ui.theme.MoeMemosDesign
+import java.time.LocalDate
 
 @Composable
-fun MemosPage(quickMemoRequestId: Long = 0L) {
+fun MemosPage(
+    quickMemoRequestId: Long = 0L,
+    initialDate: LocalDate? = null,
+) {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -61,6 +65,7 @@ fun MemosPage(quickMemoRequestId: Long = 0L) {
             MemosNavigation(
                 navController = memosNavController,
                 quickMemoRequestId = quickMemoRequestId,
+                initialDate = initialDate,
                 onMemoInputActiveChange = { memoInputActive = it },
             )
         }
@@ -87,6 +92,7 @@ fun MemosPage(quickMemoRequestId: Long = 0L) {
                 drawerState = drawerState,
                 navController = memosNavController,
                 quickMemoRequestId = quickMemoRequestId,
+                initialDate = initialDate,
                 onMemoInputActiveChange = { memoInputActive = it },
             )
         }

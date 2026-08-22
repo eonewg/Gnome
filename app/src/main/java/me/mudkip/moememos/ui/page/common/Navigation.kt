@@ -37,8 +37,11 @@ import me.mudkip.moememos.ui.page.memos.SearchPage
 import me.mudkip.moememos.ui.page.memos.TagMemoPage
 import me.mudkip.moememos.ui.page.resource.ResourceListPage
 import me.mudkip.moememos.ui.page.settings.SettingsPage
+import me.mudkip.moememos.ui.page.stats.StatsDetailPage
+import me.mudkip.moememos.ui.page.stats.StatsPage
 import me.mudkip.moememos.ui.theme.MoeMemosTheme
 import me.mudkip.moememos.viewmodel.LocalUserState
+import java.time.LocalDate
 
 @Composable
 fun Navigation() {
@@ -66,6 +69,14 @@ fun Navigation() {
                 composable(RouteName.MEMOS) {
                     MemosPage(quickMemoRequestId = quickMemoRequestId)
                 }
+
+                composable("${RouteName.MEMOS}/${RouteName.DATE}/{date}") { entry ->
+                    val date = entry.arguments?.getString("date")
+                        ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                        ?: LocalDate.now()
+                    MemosPage(initialDate = date)
+                }
+
 
                 composable(RouteName.SETTINGS) {
                     SettingsPage(navController = navController)
@@ -102,6 +113,15 @@ fun Navigation() {
                         selectedAccountKey = entry.arguments?.getString("accountKey") ?: ""
                     )
                 }
+
+                composable(RouteName.STATS) {
+                    StatsPage(navController = navController)
+                }
+
+                composable(RouteName.STATS_DETAIL) {
+                    StatsDetailPage(navController = navController)
+                }
+
 
                 composable(RouteName.SEARCH) {
                     SearchPage(navController = navController)

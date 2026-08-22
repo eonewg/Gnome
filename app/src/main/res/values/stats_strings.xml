@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">Statistics</string>
+    <string name="stats_month">Month</string>
+    <string name="stats_year">Year</string>
+    <string name="stats_more">More</string>
+    <string name="stats_record_statistics">Record statistics</string>
+    <string name="stats_memo_count">Memos</string>
+    <string name="stats_character_count">Characters</string>
+    <string name="stats_active_days">Days</string>
+    <string name="stats_month_summary">%1$d memos · %2$s characters · %3$d days</string>
+    <string name="stats_max_daily_memos">Most memos in one day</string>
+    <string name="stats_max_daily_characters">Most characters in one day</string>
+    <string name="stats_recent_year">Records in the last year</string>
+    <string name="stats_previous_month">Previous month</string>
+    <string name="stats_next_month">Next month</string>
+    <string name="stats_month_number">Month %1$d</string>
+    <string name="stats_day_number">Day %1$d</string>
+    <string name="stats_all_records">All records</string>
+    <string name="stats_select_month">Select month</string>
+    <string name="stats_previous_year">Previous year</string>
+    <string name="stats_next_year">Next year</string>
+    <string name="stats_year_number">Year %1$d</string>
+    <string name="stats_heatmap_day_tooltip">%1$d memos on %2$s</string>
+</resources>

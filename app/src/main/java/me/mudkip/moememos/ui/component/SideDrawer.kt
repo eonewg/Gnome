@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,11 +50,7 @@ import me.mudkip.moememos.ui.theme.MoeMemosDesign
 import me.mudkip.moememos.viewmodel.LocalMemos
 import me.mudkip.moememos.viewmodel.LocalUserState
 import java.net.URLEncoder
-import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.format.TextStyle
-import java.time.temporal.WeekFields
-import java.util.Locale
 
 @Composable
 fun SideDrawer(
@@ -63,12 +58,6 @@ fun SideDrawer(
     drawerState: DrawerState? = null,
     loadTags: Boolean = true,
 ) {
-    val weekDays = remember {
-        val day = WeekFields.of(Locale.getDefault()).firstDayOfWeek
-        List(DayOfWeek.entries.size) { index ->
-            day.plus(index.toLong()).getDisplayName(TextStyle.SHORT, Locale.getDefault())
-        }
-    }
     val scope = rememberCoroutineScope()
     val memosViewModel = LocalMemos.current
     val userStateViewModel = LocalUserState.current
@@ -127,31 +116,25 @@ fun SideDrawer(
         item {
             Stats(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                onClick = {
+                    scope.launch {
+                        drawerState?.close()
+                        rootNavController.navigate(RouteName.STATS) {
+                            launchSingleTop = true
+                        }
+                    }
+                },
             )
         }
 
         item {
-            Row(
+            Heatmap(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(126.dp)
                     .padding(start = 18.dp, top = 10.dp, end = 18.dp, bottom = 10.dp),
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(end = 10.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(weekDays[0], style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                    Text(weekDays[3], style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                    Text(weekDays[6], style = MaterialTheme.typography.labelSmall, color = colors.textSecondary)
-                }
-                Heatmap(
-                    modifier = Modifier.weight(1f),
-                    onDateClick = ::navigateToDate,
-                )
-            }
+                onDateClick = ::navigateToDate,
+            )
         }
 
         item { Spacer(Modifier.height(10.dp)) }

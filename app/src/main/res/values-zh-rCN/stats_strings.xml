@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stats_title">统计</string>
+    <string name="stats_month">月</string>
+    <string name="stats_year">年</string>
+    <string name="stats_more">更多</string>
+    <string name="stats_record_statistics">记录统计</string>
+    <string name="stats_memo_count">灵感</string>
+    <string name="stats_character_count">字数</string>
+    <string name="stats_active_days">天</string>
+    <string name="stats_month_summary">%1$d 条灵感 · %2$s 字 · %3$d 天</string>
+    <string name="stats_max_daily_memos">单日最多条数</string>
+    <string name="stats_max_daily_characters">单日最多字数</string>
+    <string name="stats_recent_year">最近一年记录</string>
+    <string name="stats_previous_month">上个月</string>
+    <string name="stats_next_month">下个月</string>
+    <string name="stats_month_number">%1$d月</string>
+    <string name="stats_day_number">%1$d日</string>
+    <string name="stats_all_records">全部记录</string>
+    <string name="stats_select_month">选择月份</string>
+    <string name="stats_previous_year">上一年</string>
+    <string name="stats_next_year">下一年</string>
+    <string name="stats_year_number">%1$d年</string>
+    <string name="stats_heatmap_day_tooltip">%1$d 条灵感于 %2$s</string>
+</resources>

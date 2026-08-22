@@ -20,6 +20,7 @@ fun MemosNavigation(
     navController: NavHostController,
     quickMemoRequestId: Long = 0L,
     onMemoInputActiveChange: (Boolean) -> Unit = {},
+    initialDate: LocalDate? = null,
 ) {
     val userStateViewModel = LocalUserState.current
     val currentAccount by userStateViewModel.currentAccount.collectAsState()
@@ -101,6 +102,14 @@ fun MemosNavigation(
                 popUpTo(RouteName.MEMOS) {
                     inclusive = false
                 }
+                launchSingleTop = true
+            }
+        }
+    }
+
+    LaunchedEffect(initialDate) {
+        if (initialDate != null) {
+            navController.navigate("${RouteName.DATE}/$initialDate") {
                 launchSingleTop = true
             }
         }
