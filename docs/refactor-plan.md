@@ -92,20 +92,64 @@
 
 ### Phase 9 — 移除 AbstractMemoRepository 旧抽象
 - Partial：SyncingRepository / LocalDatabaseRepository 已随 Phase 5 删除；
-  剩余 AbstractMemoRepository 接口（entity 出参）待 UI 全部迁到 domain 模型
-  （observeTimeline）后移除，随 Phase 11/12 推进。
+  Phase 10 已建立 domain 契约 `interface MemoRepository`（core.model 出参），
+  `MemoRepositoryImpl` 同时实现两者，旧 entity 接口仅作迁移 adapter。
+  剩余 entity 调用方：MemosViewModel（legacy 页面桥）、MemoDetailPage、
+  ArchivedMemoPage、ExploreList、ResourceListPage、UserStateViewModel——
+  随 Phase 15/16 页面迁移逐步收窄后移除。
 
 ### Phase 10 — 拆分 AccountService
-- Deferred：AccountStore / TokenStore / AccountSession / MemosClientFactory /
-  ServerCompatibilityChecker / AccountExportService / RemoteDataSourceFactory。
+- **Done**（4 commits：c03428ed / 4d54ed0e / 2a3d8e79 / 985db918 + b1a6d936 微调）
+  AccountService（原 27KB）瘦身为 ~125 行门面，职责拆入 `data/account/`：
+  - `AccountStore`：账号持久化 + SecureTokenStorage 令牌合并 + 当前账号；
+  - `MemosClientFactory`：Retrofit/OkHttp 客户端构建（token 拦截器）；
+  - `RemoteDataSourceFactory`：Account → MemosRemote（V0/V1/Local）；
+  - `ServerCompatibilityChecker`：登录/同步版本检测（LoginCompatibility /
+    SyncCompatibility sealed 类）；
+  - `AccountSession`：当前账号的活 repository + httpClient 生命周期、
+    `getSyncRepository(accountKey)` 按 key 现场重建（Worker 路径）；
+  - `AccountExportService`：本地账号 ZIP 导出。
+  门面方法 100% 保持原语义（切换/新增/删除账号顺序：持久化写入 → session 重建 → purge）；
+  mutex 顺序 门面 → session，`AccountSession.refresh` 不 await 初始化（防死锁）。
+
+### 建立最终 MemoRepository contract（Phase 10 附加项）
+- **Done**（commit 55f25e43）`data/repository/MemoRepository` 接口：全 core.model
+  出参（Memo/Attachment/MemoVisibility），禁止 entity/旧 data.model 泄漏；
+  `observeTimeline()` / `getMemo` / `createMemo` / `updateMemo` / `createAttachment` /
+  `deleteAttachment` 等。`MemoRepositoryImpl : AbstractMemoRepository(), MemoRepository`
+  双实现共存（同名签名一处 override；erasure 冲突处改名 listArchived/createAttachment/
+  cacheAttachmentFile）。新 ViewModel（Timeline/Editor）只依赖该契约。
+  说明：entity 路径 createMemo 的 tags 形参在实现中被忽略（标签只在 content 中），
+  domain 契约省略该参，行为等价。
 
 ### Phase 11 — Timeline Route/ViewModel/Screen
-- Deferred：拆 `MemosHomePage.kt`（1035 行）→ TimelineRoute/Screen/TopBar/List/SelectionBar/
-  Drawer/ViewModel（StateFlow<UiState>）。
+- **Done**（commit b1a6d936 域迁移 + c1e60036 拆分）：
+  - `feature/timeline/`：TimelineUiState（memos/tags/sortOrder/selection/batch/
+    syncStatus/syncAlert）、TimelineViewModel（StateFlow + collectAsStateWithLifecycle，
+    经 `MemoRepository.observeTimeline()` 取 domain 数据；reapply guard 与
+    手动批量操作后状态修补保持原语义；sortOrder 持久化到 SavedStateHandle）、
+    TimelineScreen（Scaffold/选择栏/对话框，纯 state + callback）、TimelineRoute
+    （hiltViewModel 接线 + 编辑器 bottom sheet + IME 机制原样保留）。
+  - MemoSortOrder / orderMemosForTimeline / memoMatchesDate 移入 feature.timeline；
+    MemosCard / MemosList 全面转 core.model.Memo（DomainRepresentable 桥接旧组件）。
+  - `MemosHomePage.kt`（1035 行）删除；MemosNavigation 的 MEMOS 路由指向 TimelineRoute。
+  - 过渡期：Search/Tag/Date/Stats/Detail 等 legacy 页面仍经 LocalMemos(MemosViewModel)
+    `.domainMemos` 取数，Phase 16 收口。
 
 ### Phase 12 — Editor Route/ViewModel/Screen
-- Deferred：统一 Editor（普通新增 / Quick Tile / 编辑 / 分享 / Shortcut 同一核心），
-  EditorViewModel 持有编辑状态与草稿。
+- **Done**（commit ca3dce56 组件解耦 + 4de19454 迁移）：
+  - `feature/editor/`：EditorUiState（text/visibility/attachments/tags + 派生
+    canSubmit/hasUnsavedChanges）、EditorViewModel（唯一编辑核心：草稿 DataStore
+    语义、tag-only 草稿丢弃、SavedStateHandle 文本进程恢复、附件上传/删除、
+    提交走 domain 契约本地事务 → Submitted 事件，从不等待 HTTP）、
+    EditorScreen（FullScreen/BottomSheet 双呈现）、EditorRoute（统一入口）。
+  - 四个入口全部切换：Navigation INPUT/SHARE/EDIT、TimelineRoute bottom sheet、
+    QuickMemoActivity（Quick Settings Tile）、QuickMemoLaunchPage（冷启动）。
+  - 编辑器组件与 ResourceEntity/MemoInputViewModel 解耦（MemoInputEditor 收
+    domain Attachment + 删除回调；InputImage 收 ResourceRepresentable）。
+  - `MemoInputPage.kt` / `MemoInputViewModel.kt` 删除。
+  - hashtag 自动补全（本地持续 + 远端 listTags 一次合并）、可见性、附件、
+    保存确认对话框、焦点/键盘、quick activity finish 行为保持。
 
 ### Phase 13 — Tag Parser + Tag Index
 - Deferred：`MemosTagParser` 统一全 App 标签语义（先核对最新 Memos server 行为）；
@@ -167,3 +211,9 @@
 - MemoRepository 编排层（依赖 FileStorage/SyncScheduler 具体类型）暂无 JVM 直测；
   其各组成部分（datasource 事务语义、engine 同步算法）已有测试覆盖。可后补
   Robolectric 测试（robolectric 已引入 testImplementation）。
+- Phase 12 起 Timeline/Editor 的列表刷新完全依赖 Room flow（旧实现提交后还有一次
+  手动 refreshLocalSnapshot 兜底）。reapply guard 在 sync 进行中会跳过快照重放，
+  理论上极端时序下（WorkManager 在 Room invalidation 送达前把 syncing 置真）新建
+  memo 要等本次同步结束才显示；实测路径下 invalidation 先到，真机 smoke 时留意。
+- Timeline/Editor 新架构需真机回归：时间线排序/多选/批量打标签删除/下拉刷新/
+  版本确认弹窗、编辑器草稿、分享入口、Quick Settings 冷启动捕获。
