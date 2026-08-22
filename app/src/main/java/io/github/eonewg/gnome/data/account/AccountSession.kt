@@ -16,6 +16,7 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.LocalAccount
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.repository.MemoRepository
+import io.github.eonewg.gnome.data.repository.MemoRepositoryImpl
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.sync.SyncScheduler
 import okhttp3.OkHttpClient
@@ -50,7 +51,7 @@ class AccountSession @Inject constructor(
         private set
 
     @Volatile
-    private var repository: AbstractMemoRepository = MemoRepository(
+    private var repository: AbstractMemoRepository = MemoRepositoryImpl(
         localMemoDataSource(),
         fileStorage,
         Account.Local(LocalAccount()),
@@ -143,7 +144,7 @@ class AccountSession @Inject constructor(
         repository.close()
         when (account) {
             null, is Account.Local -> {
-                this.repository = MemoRepository(
+                this.repository = MemoRepositoryImpl(
                     localMemoDataSource(),
                     fileStorage,
                     account ?: Account.Local(LocalAccount()),
@@ -168,8 +169,8 @@ class AccountSession @Inject constructor(
             RoomTransactionRunner(database),
         )
 
-    private fun buildMemoRepository(remote: RemoteDataSource, account: Account): MemoRepository {
-        return MemoRepository(
+    private fun buildMemoRepository(remote: RemoteDataSource, account: Account): MemoRepositoryImpl {
+        return MemoRepositoryImpl(
             localMemoDataSource(),
             fileStorage,
             account,
