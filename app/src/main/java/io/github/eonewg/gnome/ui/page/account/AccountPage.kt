@@ -17,20 +17,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
 import com.skydoves.sandwich.onSuccess
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemosAccount
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.ui.page.common.RouteName
-import io.github.eonewg.gnome.viewmodel.AccountViewModel
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
+import io.github.eonewg.gnome.nav.AddAccountKey
+import io.github.eonewg.gnome.nav.GnomeNavigator
+import io.github.eonewg.gnome.viewmodel.AccountViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -39,14 +38,14 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountPage(
-    navController: NavHostController,
+    navigator: GnomeNavigator,
     selectedAccountKey: String
 ) {
     val viewModel = hiltViewModel<AccountViewModel, AccountViewModel.AccountViewModelFactory> { factory ->
         factory.create(selectedAccountKey)
     }
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val selectedAccount by viewModel.selectedAccountState.collectAsState()
     val currentAccount by accountSessionViewModel.currentAccount.collectAsState()
     val memosAccount = selectedAccount.toMemosAccount()
@@ -60,10 +59,10 @@ fun AccountPage(
         coroutineScope.launch {
             val result = viewModel.exportLocalAccount(uri)
             result.onSuccess {
-                Toast.makeText(navController.context, R.string.local_export_success.string, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, R.string.local_export_success.string, Toast.LENGTH_SHORT).show()
             }.onFailure { error ->
                 val message = error.localizedMessage ?: R.string.local_export_failed.string
-                Toast.makeText(navController.context, message, Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -74,7 +73,7 @@ fun AccountPage(
                 title = { Text(text = R.string.account_detail.string) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                        navigator.goBack()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
                     }
@@ -90,7 +89,7 @@ fun AccountPage(
                     coroutineScope.launch {
                         accountSessionViewModel.switchAccount(selectedAccountKey)
                             .onSuccess {
-                                navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                                navigator.goBack()
                             }
                     }
                 },
@@ -110,7 +109,7 @@ fun AccountPage(
                     coroutineScope.launch {
                         accountSessionViewModel.switchAccount(selectedAccountKey)
                             .onSuccess {
-                                navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                                navigator.goBack()
                             }
                     }
                 },
@@ -118,14 +117,9 @@ fun AccountPage(
                     coroutineScope.launch {
                         accountSessionViewModel.logout(selectedAccountKey)
                         if (accountSessionViewModel.currentAccount.first() == null) {
-                            navController.navigate(RouteName.ADD_ACCOUNT) {
-                                popUpTo(navController.graph.id) {
-                                    inclusive = true
-                                }
-                                launchSingleTop = true
-                            }
+                            navigator.resetTo(AddAccountKey)
                         } else {
-                            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                            navigator.goBack()
                         }
                     }
                 }

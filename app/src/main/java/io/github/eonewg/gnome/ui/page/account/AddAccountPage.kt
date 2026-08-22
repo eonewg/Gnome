@@ -37,38 +37,32 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
+import androidx.compose.runtime.collectAsState
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.data.model.Account
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.ui.page.common.RouteName
-import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
+import io.github.eonewg.gnome.nav.GnomeNavigator
+import io.github.eonewg.gnome.nav.LoginKey
+import io.github.eonewg.gnome.nav.TimelineKey
+import io.github.eonewg.gnome.ui.theme.GnomeDesign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddAccountPage(
-    navController: NavHostController,
+    navigator: GnomeNavigator,
 ) {
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val accounts by accountSessionViewModel.accounts.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val coroutineScope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
     val hasLocalAccount = accounts.any { it is Account.Local }
     val isFirstRun = accounts.isEmpty()
 
     fun toMemos() {
-        navController.navigate(RouteName.MEMOS) {
-            popUpTo(navController.graph.id) {
-                inclusive = true
-            }
-            launchSingleTop = true
-        }
+        navigator.resetTo(TimelineKey)
     }
 
     Scaffold(
@@ -87,7 +81,7 @@ fun AddAccountPage(
                 navigationIcon = {
                     if (!isFirstRun) {
                         IconButton(onClick = {
-                            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                            navigator.goBack()
                         }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -154,7 +148,7 @@ fun AddAccountPage(
                     title = R.string.add_memos_account.string,
                     description = R.string.memos_account_description.string,
                     icon = Icons.Outlined.Cloud,
-                    onClick = { navController.navigate(RouteName.LOGIN) },
+                    onClick = { navigator.navigate(LoginKey) },
                 )
             }
         }

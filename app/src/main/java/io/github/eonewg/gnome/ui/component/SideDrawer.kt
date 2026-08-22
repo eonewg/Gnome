@@ -35,20 +35,23 @@ import androidx.compose.ui.unit.dp
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.feature.drawer.DrawerUiState
-import io.github.eonewg.gnome.ui.page.common.RouteName
+import io.github.eonewg.gnome.nav.ArchivedKey
+import io.github.eonewg.gnome.nav.ExploreKey
+import io.github.eonewg.gnome.nav.GnomeNavKey
+import io.github.eonewg.gnome.nav.TagKey
+import io.github.eonewg.gnome.nav.TimelineKey
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.time.LocalDate
 
 /**
  * The navigation drawer. Navigation itself happens at the hosting page: the
- * drawer only reports which destination is selected ([selectedRoute],
- * [selectedTag]) and forwards pure click callbacks.
+ * drawer only reports which destination is selected ([currentKey]) and
+ * forwards pure click callbacks.
  */
 @Composable
 fun SideDrawer(
     uiState: DrawerUiState = DrawerUiState(),
-    selectedRoute: String? = null,
-    selectedTag: String? = null,
+    currentKey: GnomeNavKey? = null,
     onStatsClick: () -> Unit = {},
     onMemosClick: () -> Unit = {},
     onExploreClick: () -> Unit = {},
@@ -61,12 +64,12 @@ fun SideDrawer(
     val colors = GnomeDesign.colors
     val displayName = uiState.displayName.ifBlank { R.string.gnome.string }
 
-    fun isSelected(route: String): Boolean {
-        return selectedRoute == route
+    fun isSelected(route: GnomeNavKey): Boolean {
+        return currentKey == route
     }
 
     fun isTagSelected(tag: String): Boolean {
-        return selectedRoute == "${RouteName.TAG}/{tag}" && selectedTag == tag
+        return currentKey is TagKey && currentKey.tag == tag
     }
 
     LazyColumn(
@@ -116,7 +119,7 @@ fun SideDrawer(
             DrawerNavigationItem(
                 label = R.string.memos.string,
                 icon = Icons.Outlined.GridView,
-                selected = isSelected(RouteName.MEMOS),
+                selected = isSelected(TimelineKey),
                 onClick = onMemosClick,
             )
         }
@@ -126,7 +129,7 @@ fun SideDrawer(
                 DrawerNavigationItem(
                     label = R.string.explore.string,
                     icon = Icons.Outlined.Home,
-                    selected = isSelected(RouteName.EXPLORE),
+                    selected = isSelected(ExploreKey),
                     onClick = onExploreClick,
                 )
             }
@@ -145,7 +148,7 @@ fun SideDrawer(
             DrawerNavigationItem(
                 label = R.string.archived.string,
                 icon = Icons.Outlined.Inventory2,
-                selected = isSelected(RouteName.ARCHIVED),
+                selected = isSelected(ArchivedKey),
                 onClick = onArchivedClick,
             )
         }

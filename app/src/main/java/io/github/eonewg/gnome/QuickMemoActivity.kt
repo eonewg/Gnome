@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
-import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import io.github.eonewg.gnome.feature.editor.EditorRoute
@@ -40,11 +39,10 @@ class QuickMemoActivity : FragmentActivity() {
         setContent {
             AppLockGate {
                 GnomeTheme {
-                    val navController = rememberNavController()
                     var editorReady by remember { mutableStateOf(false) }
 
                     if (editorReady) {
-                        EditorRoute(onFinished = ::finish, navController = navController)
+                        EditorRoute(onFinished = ::finish)
                     } else {
                         Box(
                             modifier = Modifier.fillMaxSize(),

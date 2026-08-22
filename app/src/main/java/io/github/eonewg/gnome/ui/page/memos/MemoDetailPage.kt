@@ -70,6 +70,10 @@ fun MemoDetailPage(
     val colors = GnomeDesign.colors
     var hadMemo by rememberSaveable(memoIdentifier) { mutableStateOf(false) }
 
+    LaunchedEffect(memoIdentifier) {
+        memoDetailViewModel.setMemoId(memoIdentifier)
+    }
+
     val memoCardActions = MemoCardActions(
         onEdit = { id ->
             onEditMemo(id)

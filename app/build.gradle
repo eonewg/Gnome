@@ -95,7 +95,9 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-runtime-compose:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-process:$lifecycle_version"
     implementation "androidx.activity:activity-compose:$activity_compose_version"
-    implementation "androidx.navigation:navigation-compose:$nav_version"
+    implementation "androidx.navigation3:navigation3-runtime:$nav3_version"
+    implementation "androidx.navigation3:navigation3-ui:$nav3_version"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-navigation3:$lifecycle_version"
     implementation "androidx.paging:paging-runtime-ktx:$paging_version"
     implementation "androidx.paging:paging-compose:$paging_version"
     implementation "androidx.room:room-runtime:$room_version"
@@ -117,7 +119,12 @@ dependencies {
 
     implementation "com.google.dagger:hilt-android:$hilt_version"
     ksp "com.google.dagger:hilt-compiler:$hilt_version"
-    implementation "androidx.hilt:hilt-navigation-compose:$hilt_navigation_compose_version"
+    implementation("androidx.hilt:hilt-navigation-compose:$hilt_navigation_compose_version") {
+        // hilt-navigation-compose 1.3.0 declares an API dependency on Navigation 2,
+        // but hiltViewModel() only needs lifecycle-viewmodel-compose. Gnome is fully
+        // on Navigation 3, so drop the legacy artifact.
+        exclude group: "androidx.navigation", module: "navigation-compose"
+    }
     implementation "androidx.biometric:biometric:$biometric_version"
 
     implementation "androidx.datastore:datastore:$datastore"

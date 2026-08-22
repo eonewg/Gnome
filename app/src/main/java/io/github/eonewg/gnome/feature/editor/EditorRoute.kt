@@ -11,13 +11,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.material3.SnackbarHostState
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.core.model.toCore
 import io.github.eonewg.gnome.data.model.ShareContent
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 
 /**
@@ -29,22 +26,20 @@ import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 fun EditorRoute(
     memoIdentifier: String? = null,
     shareContent: ShareContent? = null,
-    onFinished: (() -> Unit)? = null,
+    onFinished: () -> Unit = {},
     presentation: EditorPresentation = EditorPresentation.FullScreen,
     active: Boolean = true,
-    navController: NavHostController? = null,
 ) {
     val viewModel: EditorViewModel = hiltViewModel()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusRequester = remember { FocusRequester() }
     val snackbarState = remember { SnackbarHostState() }
 
     fun exitEditor() {
-        onFinished?.invoke() ?: navController?.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+        onFinished()
     }
 
     LaunchedEffect(Unit) {
@@ -57,7 +52,7 @@ fun EditorRoute(
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             when (event) {
-                EditorEvent.Submitted -> onFinished?.invoke() ?: navController?.popBackStack()
+                EditorEvent.Submitted -> onFinished()
                 EditorEvent.Refocus -> focusRequester.requestFocus()
                 is EditorEvent.ShowMessage -> snackbarState.showSnackbar(event.message)
             }

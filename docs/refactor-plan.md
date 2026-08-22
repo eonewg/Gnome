@@ -211,8 +211,35 @@
     navigation 2.9.7 下会因目标缺失抛 IllegalArgumentException）。
   - 验证：129 单测全绿，assembleDebug + assembleRelease 通过。
 
-### Phase 17 — Navigation 重构
-- Deferred：单独提交，评估 Navigation 3 typed key。
+### Phase 17 — Navigation 3 Migration
+- **Done**（commit pending，Navigation 3 1.1.6）：
+  - 依赖：`navigation3-runtime:1.1.6` + `navigation3-ui:1.1.6` + `lifecycle-viewmodel-navigation3`
+    （entry 级 ViewModelStore + SavedStateHandle），删除 `navigation-compose:2.9.7`，
+    并对 `hilt-navigation-compose`（1.3.0 把 nav2 声明为 API 依赖）exclude
+    `navigation-compose`——classpath 验证 Navigation 2 为 0。
+  - 单栈扁平化：`nav/GnomeNavKey.kt`（@Serializable sealed interface，18 个 typed key，
+    参数只传 primitive/id/date-string）+ `nav/GnomeNavigator.kt`（navigate/goBack/
+    resetTo/popUpTo，纯 list mutation）；root + inner 双层 NavHost 合并为
+    `ui/page/common/Navigation.kt` 的单一 `rememberNavBackStack` + 单 `NavDisplay` +
+    `entryProvider` DSL。Drawer 只包裹 memo 域 key（isDrawerScoped），modal 手势
+    与 permanent sheet 行为与旧内层图一致。
+  - Route 全部改持 `GnomeNavigator` 回调（Timeline/Editor/MemoDetail/Search/Stats/
+    StatsDetail/Tag/Date）；Login 成功 `resetTo(TimelineKey)`、登出无账号
+    `resetTo(AddAccountKey)`、Stats 日期跳转 `popUpTo(StatsKey, inclusive)+DateKey`
+    ——back 不再回登录/账号页。MemoDetailViewModel 的 memoId 由 SavedStateHandle
+    改为 Route `setMemoId`（typed key 直传）；EditorRoute 删除 navController 参数
+    （onFinished 必达），QuickMemoActivity/QuickMemoLaunchPage 清理 Nav2 残留。
+  - SideDrawer selection 改为 `currentKey: GnomeNavKey` 类型判断（TagDrawerItem
+    选中 = currentKey is TagKey && tag 相等）。
+  - 删除：MemosPage.kt / MemosNavigation.kt / RouteName.kt / NavControllerExt.kt。
+  - 测试：新增 `nav/GnomeNavigatorTest` 16 用例（rapid back、中文与斜杠 tag
+    `#408/计网`、memoId 特殊字符不经编码、date ISO roundtrip、login/logout
+    reset、popUpTo 语义），145 单测全绿 + assembleDebug + assembleRelease 通过。
+  - Deep links：Manifest 无 URL deep link（仅 SEND/SEND_MULTIPLE/QS Tile/AppWidget
+    intent-filter），intent action 处理迁到 typed key 导航；record “不适用”。
+  - 已知残余差异：进程死亡后 Timeline sortOrder/Editor 未提交文本（SavedStateHandle
+    初始值）不再恢复（Nav3 不注入 nav 参数），属可接受边缘差异；NavDisplay 渲染
+    层（动画/手势/登录流）仍需真机 smoke。
 
 ### Phase 18 — Widget / Quick Capture 架构清理
 - Deferred。

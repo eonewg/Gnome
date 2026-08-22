@@ -1,17 +1,17 @@
 package io.github.eonewg.gnome.feature.timeline
 
-import android.net.Uri
 import androidx.compose.material3.DrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
+import io.github.eonewg.gnome.nav.EditorKey
+import io.github.eonewg.gnome.nav.GnomeNavigator
+import io.github.eonewg.gnome.nav.MemoDetailKey
+import io.github.eonewg.gnome.nav.TagKey
 import io.github.eonewg.gnome.ui.component.MemoCardActions
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 import java.time.LocalDate
 
 /** Registers the per-date memo list: ViewModel → UiState → Screen wiring. */
@@ -19,7 +19,7 @@ import java.time.LocalDate
 fun DateMemoRoute(
     drawerState: DrawerState? = null,
     date: LocalDate,
-    navController: NavHostController,
+    navigator: GnomeNavigator,
 ) {
     val dateMemoViewModel: DateMemoViewModel = hiltViewModel()
     val uiState by dateMemoViewModel.uiState.collectAsStateWithLifecycle()
@@ -27,10 +27,10 @@ fun DateMemoRoute(
 
     val memoCardActions = MemoCardActions(
         onOpen = { memo ->
-            navController.navigate("${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(memo.id)}")
+            navigator.navigate(MemoDetailKey(memo.id))
         },
         onEdit = { memoId ->
-            navController.navigate("${RouteName.EDIT}?memoId=$memoId")
+            navigator.navigate(EditorKey(memoId))
         },
         onTogglePin = { memoId, pinned ->
             scope.launch { dateMemoViewModel.updateMemoPinned(memoId, pinned) }
@@ -57,10 +57,7 @@ fun DateMemoRoute(
         drawerState = drawerState,
         uiState = uiState,
         onTagClick = { tag ->
-            navController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
-                launchSingleTop = true
-                restoreState = true
-            }
+            navigator.navigate(TagKey(tag), singleTop = true)
         },
         actions = memoCardActions,
     )

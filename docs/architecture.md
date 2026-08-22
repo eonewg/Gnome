@@ -39,7 +39,7 @@ io.github.eonewg.gnome
 依赖方向：`feature → (repository / sync status) → (data.local / data.remote) / sync`。
 feature 不感知 MemosV0/V1、Room schema、Repository 实现细节。
 
-进度注记（2026-08-22，Phase 16.5 完成）：`core/model`、`data/local/LocalMemoDataSource`、
+进度注记（2026-08-22，Phase 17 完成）：`core/model`、`data/local/LocalMemoDataSource`、
 `data/remote(/memos)`、`data/account`（AccountStore / AccountSession / 客户端与数据源
 工厂 / ServerCompatibilityChecker / AccountExportService，AccountService 仅剩门面）、
 domain 契约 `data/repository/MemoRepository`（core.model 出参，`MemoRepositoryImpl`
@@ -57,9 +57,14 @@ MemoRepository。Feature/UI 层不再引用 Room entity 或 wire DTO：列表读
 `MemoRepository` 领域流（observeTimeline / observeArchived / observeMemosByTag /
 observeSearch / observeAttachments），附件链统一 `ResourceRepresentable`（含
 identifier），visibility presentation 扩展在 `core.model.MemoVisibility` 上；
-导航只发生在 Route 层（SideDrawer 等组件为纯回调）。仍在 Navigation 3 范围内收口：
-根图目的页面（Login/AddAccount/Account/Settings）与 QuickMemoActivity 宿主继续
-持有各自 NavHostController。详见 [refactor-plan.md](refactor-plan.md)。
+导航只发生在 Route 层（SideDrawer 等组件为纯回调）。已随 Phase 17 切换到
+**Navigation 3（1.1.6）**：`nav/GnomeNavKey`（@Serializable sealed interface，typed
+key）+ `nav/GnomeNavigator`（唯一 back stack 修改点）；root/inner 双层 NavHost 合并为
+`ui/page/common/Navigation.kt` 单一 `rememberNavBackStack` + `NavDisplay` +
+`entryProvider`，Navigation 2（`navigation-compose`）与 `RouteName`/`NavController`
+全仓库清零；`lifecycle-viewmodel-navigation3` 为每个 entry 提供独立 ViewModelStore
+与 SavedStateHandle，`hiltViewModel()` 在 entry 内保持逐页作用域。详见
+[refactor-plan.md](refactor-plan.md)。
 
 ## 数据与同步模型
 

@@ -1,10 +1,8 @@
 package io.github.eonewg.gnome.feature.memo
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
-import io.github.eonewg.gnome.ui.page.common.RouteName
+import io.github.eonewg.gnome.nav.EditorKey
+import io.github.eonewg.gnome.nav.GnomeNavigator
 import io.github.eonewg.gnome.ui.page.memos.MemoDetailPage
 
 /**
@@ -14,14 +12,13 @@ import io.github.eonewg.gnome.ui.page.memos.MemoDetailPage
 @Composable
 fun MemoDetailRoute(
     memoIdentifier: String,
-    navController: NavHostController,
+    navigator: GnomeNavigator,
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
     MemoDetailPage(
         memoIdentifier = memoIdentifier,
-        onBack = { navController.popBackStackIfLifecycleIsResumed(lifecycleOwner) },
+        onBack = { navigator.goBack() },
         onEditMemo = { memoId ->
-            navController.navigate("${RouteName.EDIT}?memoId=$memoId")
+            navigator.navigate(EditorKey(memoId))
         },
     )
 }

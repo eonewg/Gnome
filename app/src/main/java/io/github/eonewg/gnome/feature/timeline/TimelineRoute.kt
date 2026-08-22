@@ -3,7 +3,6 @@ package io.github.eonewg.gnome.feature.timeline
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.net.Uri
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -47,21 +46,23 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.feature.editor.EditorPresentation
 import io.github.eonewg.gnome.feature.editor.EditorRoute
+import io.github.eonewg.gnome.nav.GnomeNavigator
+import io.github.eonewg.gnome.nav.EditorKey
+import io.github.eonewg.gnome.nav.MemoDetailKey
+import io.github.eonewg.gnome.nav.SearchKey
+import io.github.eonewg.gnome.nav.TagKey
 import io.github.eonewg.gnome.ui.component.MemoCardActions
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.net.URLEncoder
 
 @Composable
 fun TimelineRoute(
     drawerState: DrawerState? = null,
-    navController: NavHostController,
+    navigator: GnomeNavigator,
     quickMemoRequestId: Long = 0L,
     onMemoInputActiveChange: (Boolean) -> Unit = {},
 ) {
@@ -73,10 +74,10 @@ fun TimelineRoute(
 
     val memoCardActions = MemoCardActions(
         onOpen = { memo ->
-            navController.navigate("${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(memo.id)}")
+            navigator.navigate(MemoDetailKey(memo.id))
         },
         onEdit = { memoId ->
-            navController.navigate("${RouteName.EDIT}?memoId=$memoId")
+            navigator.navigate(EditorKey(memoId))
         },
         onTogglePin = { memoId, pinned ->
             scope.launch { timelineViewModel.updateMemoPinned(memoId, pinned) }
@@ -223,7 +224,7 @@ fun TimelineRoute(
                 scope.launch { drawerState?.open() }
             },
             onSearchClick = {
-                navController.navigate(RouteName.SEARCH)
+                navigator.navigate(SearchKey)
             },
             onEnterSelectionMode = timelineViewModel::enterSelectionMode,
             onExitSelectionMode = timelineViewModel::exitSelectionMode,
@@ -246,10 +247,7 @@ fun TimelineRoute(
                 scope.launch { timelineViewModel.syncNow(allowHigherV1Version = version) }
             },
             onTagClick = { tag ->
-                navController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
-                    launchSingleTop = true
-                    restoreState = true
-                }
+                navigator.navigate(TagKey(tag), singleTop = true)
             },
             isRemoteAccount = !uiState.isLocalAccount,
             host = uiState.host,

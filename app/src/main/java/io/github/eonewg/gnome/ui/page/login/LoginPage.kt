@@ -53,27 +53,24 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavHostController
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.suspendOnErrorMessage
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 import io.github.eonewg.gnome.feature.account.LoginCompatibility
-import io.github.eonewg.gnome.ui.page.common.RouteName
+import io.github.eonewg.gnome.nav.GnomeNavigator
+import io.github.eonewg.gnome.nav.TimelineKey
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginPage(
-    navController: NavHostController
+    navigator: GnomeNavigator
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val currentAccount by accountSessionViewModel.currentAccount.collectAsStateWithLifecycle()
     val snackbarState = remember { SnackbarHostState() }
@@ -129,12 +126,7 @@ fun LoginPage(
             allowHigherV1Version = allowHigherV1Version,
         )
         resp.suspendOnSuccess {
-            navController.navigate(RouteName.MEMOS) {
-                popUpTo(navController.graph.id) {
-                    inclusive = true
-                }
-                launchSingleTop = true
-            }
+            navigator.resetTo(TimelineKey)
         }
         .suspendOnErrorMessage {
             snackbarState.showSnackbar(it)
@@ -185,7 +177,7 @@ fun LoginPage(
                 navigationIcon = {
                     if (isAddAccount) {
                         IconButton(onClick = {
-                            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                            navigator.goBack()
                         }) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,

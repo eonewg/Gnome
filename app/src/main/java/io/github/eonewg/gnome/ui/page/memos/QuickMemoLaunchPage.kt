@@ -52,7 +52,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.delay
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import io.github.eonewg.gnome.R
@@ -74,7 +73,6 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
     val quickMemoViewModel: QuickMemoViewModel = hiltViewModel()
     val memos by quickMemoViewModel.memos.collectAsState()
-    val navController = rememberNavController()
     val imeInsets = WindowInsets.ime
     val imeBottom = imeInsets.getBottom(LocalDensity.current)
     val editorRevealed = remember { mutableStateOf(false) }
@@ -253,7 +251,6 @@ fun QuickMemoLaunchPage(onFinished: () -> Unit) {
                             presentation = EditorPresentation.BottomSheet,
                             onFinished = { finishCapture() },
                             active = true,
-                            navController = navController,
                         )
                     }
                 }

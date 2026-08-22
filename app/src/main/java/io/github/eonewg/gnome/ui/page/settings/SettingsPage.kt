@@ -37,8 +37,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
@@ -46,11 +44,12 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoEditGesture
 import io.github.eonewg.gnome.data.model.Settings
 import io.github.eonewg.gnome.data.model.displayTitle
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.nav.AccountKey
+import io.github.eonewg.gnome.nav.AddAccountKey
+import io.github.eonewg.gnome.nav.GnomeNavigator
 import io.github.eonewg.gnome.ui.component.MemosIcon
-import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.security.AppLockAuthenticator
 import io.github.eonewg.gnome.ui.security.AppLockSession
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
@@ -58,11 +57,10 @@ import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsPage(
-    navController: NavHostController
+    navigator: GnomeNavigator
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
-    val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val scope = rememberCoroutineScope()
@@ -101,7 +99,7 @@ fun SettingsPage(
                 title = { Text(text = R.string.settings.string) },
                 navigationIcon = {
                     IconButton(onClick = {
-                        navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
+                        navigator.goBack()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
                     }
@@ -138,7 +136,7 @@ fun SettingsPage(
                                     )
                                 }
                         }) {
-                            navController.navigate("${RouteName.ACCOUNT}?accountKey=${account.accountKey()}")
+                            navigator.navigate(AccountKey(account.accountKey()))
                         }
                     }
                     is Account.MemosV1 -> item {
@@ -155,7 +153,7 @@ fun SettingsPage(
                                     )
                                 }
                         }) {
-                            navController.navigate("${RouteName.ACCOUNT}?accountKey=${account.accountKey()}")
+                            navigator.navigate(AccountKey(account.accountKey()))
                         }
                     }
                     is Account.Local -> item {
@@ -168,7 +166,7 @@ fun SettingsPage(
                                 )
                             }
                         }) {
-                            navController.navigate("${RouteName.ACCOUNT}?accountKey=${account.accountKey()}")
+                            navigator.navigate(AccountKey(account.accountKey()))
                         }
                     }
                 }
@@ -176,7 +174,7 @@ fun SettingsPage(
 
             item {
                 SettingItem(icon = Icons.Outlined.PersonAdd, text = R.string.add_account.string) {
-                    navController.navigate(RouteName.ADD_ACCOUNT)
+                    navigator.navigate(AddAccountKey)
                 }
             }
 

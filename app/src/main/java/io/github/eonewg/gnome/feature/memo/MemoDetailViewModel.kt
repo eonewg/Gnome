@@ -1,7 +1,6 @@
 package io.github.eonewg.gnome.feature.memo
 
 import android.net.Uri
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.skydoves.sandwich.ApiResponse
@@ -14,6 +13,7 @@ import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.data.service.MemoService
 import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -23,23 +23,31 @@ import kotlinx.coroutines.flow.stateIn
  * The single-memo detail view: the memo is picked from the account's live
  * memo flow so edits and deletions propagate immediately (and a deleted memo
  * pops the page, as the legacy home snapshot did).
+ *
+ * The memo id is supplied by the route (typed navigation key), not by a
+ * SavedStateHandle: the entry decorators still provide the handle for any
+ * UI-scoped state, but navigation arguments travel through [setMemoId].
  */
 @HiltViewModel
 class MemoDetailViewModel @Inject constructor(
     private val memoService: MemoService,
     private val accountService: AccountService,
     private val memoActions: MemoActions,
-    savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
-    private val memoId: String? = savedStateHandle["memoId"]
+    private val memoId = MutableStateFlow<String?>(null)
+
+    fun setMemoId(id: String) {
+        memoId.value = id
+    }
 
     val uiState: StateFlow<MemoDetailUiState> = combine(
+        memoId,
         memoService.domainMemos,
         accountService.currentAccount,
-    ) { memos, account ->
+    ) { id, memos, account ->
         MemoDetailUiState(
-            memo = memoId?.let { id -> memos.firstOrNull { it.id == id } },
+            memo = id?.let { memoId -> memos.firstOrNull { it.id == memoId } },
             isRemoteAccount = account !is Account.Local,
             host = when (account) {
                 is Account.MemosV0 -> account.info.host
@@ -58,25 +66,20 @@ class MemoDetailViewModel @Inject constructor(
     // Single-memo operations; the live memo flow re-emits after every write.
     // -----------------------------------------------------------------------
 
-    suspend fun updateMemoContent(content: String): ApiResponse<Memo> {
-        val id = memoId ?: return ApiResponse.exception(IllegalStateException("No memo id"))
-        return memoActions.updateContent(id, content)
-    }
+    private suspend fun currentMemoId(): String =
+        memoId.value ?: throw IllegalStateException("No memo id")
 
-    suspend fun updateMemoPinned(pinned: Boolean): ApiResponse<Memo> {
-        val id = memoId ?: return ApiResponse.exception(IllegalStateException("No memo id"))
-        return memoActions.updatePinned(id, pinned)
-    }
+    suspend fun updateMemoContent(content: String): ApiResponse<Memo> =
+        memoActions.updateContent(currentMemoId(), content)
 
-    suspend fun archiveMemo(): ApiResponse<Unit> {
-        val id = memoId ?: return ApiResponse.exception(IllegalStateException("No memo id"))
-        return memoActions.archive(id)
-    }
+    suspend fun updateMemoPinned(pinned: Boolean): ApiResponse<Memo> =
+        memoActions.updatePinned(currentMemoId(), pinned)
 
-    suspend fun deleteMemo(): ApiResponse<Unit> {
-        val id = memoId ?: return ApiResponse.exception(IllegalStateException("No memo id"))
-        return memoActions.delete(id)
-    }
+    suspend fun archiveMemo(): ApiResponse<Unit> =
+        memoActions.archive(currentMemoId())
+
+    suspend fun deleteMemo(): ApiResponse<Unit> =
+        memoActions.delete(currentMemoId())
 
     suspend fun cacheResourceFile(resourceId: String, uri: Uri): ApiResponse<Unit> =
         memoActions.cacheResource(resourceId, uri)

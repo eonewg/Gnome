@@ -1,199 +1,362 @@
 package io.github.eonewg.gnome.ui.page.common
 
 import android.content.Intent
-import android.net.Uri
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.PermanentDrawerSheet
+import androidx.compose.material3.PermanentNavigationDrawer
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.util.Consumer
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
+import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
+import androidx.window.core.layout.WindowSizeClass
 import io.github.eonewg.gnome.MainActivity
+import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.ShareContent
-import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
-import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
+import io.github.eonewg.gnome.feature.drawer.DrawerViewModel
 import io.github.eonewg.gnome.feature.editor.EditorRoute
+import io.github.eonewg.gnome.feature.memo.MemoDetailRoute
+import io.github.eonewg.gnome.feature.search.SearchRoute
+import io.github.eonewg.gnome.feature.stats.StatsDetailRoute
+import io.github.eonewg.gnome.feature.stats.StatsRoute
+import io.github.eonewg.gnome.feature.tag.TagMemoRoute
+import io.github.eonewg.gnome.feature.timeline.DateMemoRoute
+import io.github.eonewg.gnome.feature.timeline.TimelineRoute
+import io.github.eonewg.gnome.nav.AccountKey
+import io.github.eonewg.gnome.nav.AddAccountKey
+import io.github.eonewg.gnome.nav.ArchivedKey
+import io.github.eonewg.gnome.nav.DateKey
+import io.github.eonewg.gnome.nav.EditorKey
+import io.github.eonewg.gnome.nav.ExploreKey
+import io.github.eonewg.gnome.nav.GnomeNavKey
+import io.github.eonewg.gnome.nav.GnomeNavigator
+import io.github.eonewg.gnome.nav.LoginKey
+import io.github.eonewg.gnome.nav.MemoDetailKey
+import io.github.eonewg.gnome.nav.ResourcesKey
+import io.github.eonewg.gnome.nav.SearchKey
+import io.github.eonewg.gnome.nav.SettingsKey
+import io.github.eonewg.gnome.nav.ShareKey
+import io.github.eonewg.gnome.nav.StatsDetailKey
+import io.github.eonewg.gnome.nav.StatsKey
+import io.github.eonewg.gnome.nav.TagKey
+import io.github.eonewg.gnome.nav.TimelineKey
+import io.github.eonewg.gnome.nav.isDrawerScoped
+import io.github.eonewg.gnome.ui.component.SideDrawer
 import io.github.eonewg.gnome.ui.page.account.AccountPage
 import io.github.eonewg.gnome.ui.page.account.AddAccountPage
 import io.github.eonewg.gnome.ui.page.login.LoginPage
-import io.github.eonewg.gnome.ui.page.memos.MemosPage
-import io.github.eonewg.gnome.feature.memo.MemoDetailRoute
-import io.github.eonewg.gnome.feature.search.SearchRoute
-import io.github.eonewg.gnome.feature.tag.TagMemoRoute
+import io.github.eonewg.gnome.ui.page.memos.ArchivedMemoPage
+import io.github.eonewg.gnome.ui.page.memos.ExplorePage
 import io.github.eonewg.gnome.ui.page.resource.ResourceListPage
 import io.github.eonewg.gnome.ui.page.settings.SettingsPage
-import io.github.eonewg.gnome.feature.stats.StatsDetailRoute
-import io.github.eonewg.gnome.feature.stats.StatsRoute
+import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.ui.theme.GnomeTheme
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+/**
+ * The single Navigation 3 host: one typed back stack, one [NavDisplay], and a
+ * drawer that only wraps the memo-scoped destinations. The legacy root/inner
+ * double NavHost is gone; memo pages (timeline/archived/tag/date/explore/
+ * search/detail/edit) are drawer-scoped exactly as the inner graph used to be.
+ */
 @Composable
 fun Navigation() {
-    val navController = rememberNavController()
+    val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
+    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val backStack = rememberNavBackStack(TimelineKey)
+    val navigator = remember { GnomeNavigator(backStack) }
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
+    val drawerViewModel: DrawerViewModel = hiltViewModel()
+    val drawerUiState by drawerViewModel.uiState.collectAsStateWithLifecycle()
+    val currentAccount by accountSessionViewModel.currentAccount.collectAsStateWithLifecycle()
+    val hasExplore = currentAccount !is Account.Local
     val context = LocalContext.current
     var shareContent by remember { mutableStateOf<ShareContent?>(null) }
     var quickMemoRequestId by remember { mutableStateOf(0L) }
+    var memoInputActive by rememberSaveable { mutableStateOf(false) }
+    val colors = GnomeDesign.colors
+    val currentKey = backStack.lastOrNull() as? GnomeNavKey
 
-    GnomeTheme {
-            NavHost(
-                modifier = Modifier.background(MaterialTheme.colorScheme.surface),
-                navController = navController,
-                startDestination = RouteName.MEMOS,
-                enterTransition = {
-                    slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Up,
-                        initialOffset = { it / 4 }) + fadeIn()
-                },
-                exitTransition = {
-                    slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Down,
-                        targetOffset = { it / 4 }) + fadeOut()
-                },
-            ) {
-                composable(RouteName.MEMOS) {
-                    MemosPage(navController = navController, quickMemoRequestId = quickMemoRequestId)
-                }
-
-                composable("${RouteName.MEMOS}/${RouteName.DATE}/{date}") { entry ->
-                    val date = entry.arguments?.getString("date")
-                        ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
-                        ?: LocalDate.now()
-                    MemosPage(navController = navController, initialDate = date)
-                }
-
-
-                composable(RouteName.SETTINGS) {
-                    SettingsPage(navController = navController)
-                }
-
-                composable(RouteName.ADD_ACCOUNT) {
-                    AddAccountPage(navController = navController)
-                }
-
-                composable(RouteName.LOGIN) {
-                    LoginPage(navController = navController)
-                }
-
-                composable(RouteName.INPUT) {
-                    EditorRoute(navController = navController)
-                }
-
-                composable(RouteName.SHARE) {
-                    EditorRoute(shareContent = shareContent, navController = navController)
-                }
-
-                composable("${RouteName.EDIT}?memoId={id}"
-                ) { entry ->
-                    EditorRoute(memoIdentifier = entry.arguments?.getString("id"), navController = navController)
-                }
-
-                composable(RouteName.RESOURCE) {
-                    val lifecycleOwner = LocalLifecycleOwner.current
-                    ResourceListPage(onBack = {
-                        navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
-                    })
-                }
-
-                composable("${RouteName.ACCOUNT}?accountKey={accountKey}") { entry ->
-                    AccountPage(
-                        navController = navController,
-                        selectedAccountKey = entry.arguments?.getString("accountKey") ?: ""
-                    )
-                }
-
-                composable(RouteName.STATS) {
-                    StatsRoute(navController = navController)
-                }
-
-                composable(RouteName.STATS_DETAIL) {
-                    StatsDetailRoute(navController = navController)
-                }
-
-
-                composable(RouteName.SEARCH) {
-                    SearchRoute(navController = navController)
-                }
-
-                composable("${RouteName.TAG}/{tag}") { entry ->
-                    val tag = entry.arguments?.getString("tag")?.let(Uri::decode) ?: ""
-                    TagMemoRoute(tag = tag, navController = navController)
-                }
-
-                composable("${RouteName.MEMO_DETAIL}?memoId={memoId}") { entry ->
-                    val memoId = entry.arguments?.getString("memoId")
-                    if (memoId != null) {
-                        MemoDetailRoute(memoIdentifier = Uri.decode(memoId), navController = navController)
-                    }
-                }
-            }
+    fun drawerNavigate(action: () -> Unit) {
+        scope.launch {
+            action()
+            drawerState.close()
+        }
     }
 
-
-    LaunchedEffect(Unit) {
-        if (!accountSessionViewModel.hasAnyAccount()) {
-            if (navController.currentDestination?.route != RouteName.ADD_ACCOUNT) {
-                navController.navigate(RouteName.ADD_ACCOUNT) {
-                    popUpTo(navController.graph.id) {
-                        inclusive = true
+    val drawerContent: @Composable () -> Unit = {
+        SideDrawer(
+            uiState = drawerUiState,
+            currentKey = currentKey,
+            onStatsClick = {
+                drawerNavigate { navigator.navigate(StatsKey, singleTop = true) }
+            },
+            onMemosClick = {
+                drawerNavigate { navigator.navigate(TimelineKey, singleTop = true) }
+            },
+            onExploreClick = {
+                drawerNavigate {
+                    // Local accounts have no explore feed; keep the drawer item visible
+                    // but fall back to the timeline instead of flashing an empty page.
+                    if (hasExplore) {
+                        navigator.navigate(ExploreKey, singleTop = true)
+                    } else {
+                        navigator.navigate(TimelineKey, singleTop = true)
                     }
-                    launchSingleTop = true
                 }
+            },
+            onResourcesClick = {
+                drawerNavigate { navigator.navigate(ResourcesKey) }
+            },
+            onArchivedClick = {
+                drawerNavigate { navigator.navigate(ArchivedKey, singleTop = true) }
+            },
+            onSettingsClick = {
+                drawerNavigate { navigator.navigate(SettingsKey) }
+            },
+            onTagClick = { tag ->
+                drawerNavigate { navigator.navigate(TagKey(tag), singleTop = true) }
+            },
+            onDateClick = { date ->
+                drawerNavigate { navigator.navigate(DateKey(date.toString()), singleTop = true) }
+            },
+        )
+    }
+
+    val entryProvider = entryProvider<NavKey> {
+        entry<TimelineKey> {
+            TimelineRoute(
+                drawerState = drawerState,
+                navigator = navigator,
+                quickMemoRequestId = quickMemoRequestId,
+                onMemoInputActiveChange = { memoInputActive = it },
+            )
+        }
+
+        entry<ArchivedKey> {
+            ArchivedMemoPage(drawerState = drawerState)
+        }
+
+        entry<ExploreKey> {
+            ExplorePage(drawerState = drawerState)
+        }
+
+        entry<SearchKey> {
+            SearchRoute(navigator = navigator)
+        }
+
+        entry<TagKey> { key ->
+            TagMemoRoute(
+                drawerState = drawerState,
+                tag = key.tag,
+                navigator = navigator,
+            )
+        }
+
+        entry<DateKey> { key ->
+            val date = runCatching { LocalDate.parse(key.date) }.getOrNull() ?: LocalDate.now()
+            DateMemoRoute(
+                drawerState = drawerState,
+                date = date,
+                navigator = navigator,
+            )
+        }
+
+        entry<MemoDetailKey> { key ->
+            MemoDetailRoute(memoIdentifier = key.memoId, navigator = navigator)
+        }
+
+        entry<EditorKey> { key ->
+            EditorRoute(memoIdentifier = key.memoId, onFinished = { navigator.goBack() })
+        }
+
+        entry<ShareKey> {
+            EditorRoute(shareContent = shareContent, onFinished = { navigator.goBack() })
+        }
+
+        entry<StatsKey> {
+            StatsRoute(navigator = navigator)
+        }
+
+        entry<StatsDetailKey> {
+            StatsDetailRoute(navigator = navigator)
+        }
+
+        entry<ResourcesKey> {
+            ResourceListPage(onBack = { navigator.goBack() })
+        }
+
+        entry<SettingsKey> {
+            SettingsPage(navigator = navigator)
+        }
+
+        entry<AddAccountKey> {
+            AddAccountPage(navigator = navigator)
+        }
+
+        entry<LoginKey> {
+            LoginPage(navigator = navigator)
+        }
+
+        entry<AccountKey> { key ->
+            AccountPage(navigator = navigator, selectedAccountKey = key.accountKey)
+        }
+    }
+
+    val content: @Composable () -> Unit = {
+        val entries = rememberDecoratedNavEntries(
+            backStack = backStack,
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator<NavKey>(),
+                rememberViewModelStoreNavEntryDecorator<NavKey>(),
+            ),
+            entryProvider = entryProvider,
+        )
+        NavDisplay(
+            entries = entries,
+            onBack = { navigator.goBack() },
+            modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+            transitionSpec = {
+                (
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Up,
+                        initialOffset = { it / 4 },
+                    ) + fadeIn()
+                    ) togetherWith (
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Down,
+                        targetOffset = { it / 4 },
+                    ) + fadeOut()
+                    )
+            },
+            popTransitionSpec = {
+                (fadeIn()) togetherWith (fadeOut())
+            },
+        )
+    }
+
+    GnomeTheme {
+        if (windowSizeClass.isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)) {
+            if (isDrawerScoped(currentKey)) {
+                PermanentNavigationDrawer(
+                    drawerContent = {
+                        PermanentDrawerSheet(
+                            drawerContainerColor = colors.cardBackground,
+                        ) {
+                            drawerContent()
+                        }
+                    }
+                ) {
+                    content()
+                }
+            } else {
+                content()
+            }
+        } else {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                gesturesEnabled = isDrawerScoped(currentKey) && !memoInputActive,
+                drawerContent = {
+                    ModalDrawerSheet(
+                        modifier = Modifier.fillMaxWidth(0.84f),
+                        drawerShape = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp),
+                        drawerContainerColor = colors.cardBackground,
+                        drawerTonalElevation = 0.dp,
+                    ) {
+                        drawerContent()
+                    }
+                }
+            ) {
+                content()
             }
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (!accountSessionViewModel.hasAnyAccount()) {
+            navigator.resetTo(AddAccountKey)
+        }
+    }
+
+    LaunchedEffect(memoInputActive) {
+        if (memoInputActive && drawerState.isOpen) {
+            drawerState.close()
+        }
+    }
+
+    BackHandler(enabled = drawerState.isOpen) {
+        scope.launch {
+            drawerState.close()
+        }
+    }
+
     fun handleIntent(intent: Intent) {
-        when(intent.action) {
+        when (intent.action) {
             Intent.ACTION_SEND, Intent.ACTION_SEND_MULTIPLE -> {
                 shareContent = ShareContent.parseIntent(intent)
-                navController.navigate(RouteName.SHARE)
+                navigator.navigate(ShareKey)
             }
             Intent.ACTION_VIEW -> {
                 when (intent.getStringExtra("action")) {
-                    "compose" -> navController.navigate(RouteName.INPUT)
-                    "search" -> navController.navigate(RouteName.SEARCH)
+                    "compose" -> navigator.navigate(EditorKey())
+                    "search" -> navigator.navigate(SearchKey)
                 }
             }
             MainActivity.ACTION_NEW_MEMO -> {
-                navController.navigate(RouteName.INPUT)
+                navigator.navigate(EditorKey())
             }
             MainActivity.ACTION_QUICK_MEMO -> {
                 quickMemoRequestId += 1
-                navController.navigate(RouteName.MEMOS) {
-                    popUpTo(RouteName.MEMOS) {
-                        inclusive = false
-                    }
-                    launchSingleTop = true
-                }
+                // Back to the timeline (clearing whatever is above it) before the
+                // quick request opens the inline editor.
+                navigator.popUpTo(TimelineKey)
                 // Prevent an Activity recreation from reopening an already consumed request.
                 intent.action = null
             }
             MainActivity.ACTION_EDIT_MEMO -> {
                 val memoId = intent.getStringExtra(MainActivity.EXTRA_MEMO_ID)
                 if (memoId != null) {
-                    navController.navigate("${RouteName.EDIT}?memoId=$memoId")
+                    navigator.navigate(EditorKey(memoId))
                 }
             }
             MainActivity.ACTION_VIEW_MEMO -> {
                 val memoId = intent.getStringExtra(MainActivity.EXTRA_MEMO_ID)
                 if (memoId != null) {
-                    navController.navigate("${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(memoId)}")
+                    navigator.navigate(MemoDetailKey(memoId))
                 }
             }
         }
