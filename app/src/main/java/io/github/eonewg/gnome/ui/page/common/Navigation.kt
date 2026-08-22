@@ -37,8 +37,8 @@ import io.github.eonewg.gnome.feature.search.SearchRoute
 import io.github.eonewg.gnome.ui.page.memos.TagMemoPage
 import io.github.eonewg.gnome.ui.page.resource.ResourceListPage
 import io.github.eonewg.gnome.ui.page.settings.SettingsPage
-import io.github.eonewg.gnome.ui.page.stats.StatsDetailPage
-import io.github.eonewg.gnome.ui.page.stats.StatsPage
+import io.github.eonewg.gnome.feature.stats.StatsDetailRoute
+import io.github.eonewg.gnome.feature.stats.StatsRoute
 import io.github.eonewg.gnome.ui.theme.GnomeTheme
 import io.github.eonewg.gnome.viewmodel.LocalUserState
 import java.time.LocalDate
@@ -115,11 +115,11 @@ fun Navigation() {
                 }
 
                 composable(RouteName.STATS) {
-                    StatsPage(navController = navController)
+                    StatsRoute(navController = navController)
                 }
 
                 composable(RouteName.STATS_DETAIL) {
-                    StatsDetailPage(navController = navController)
+                    StatsDetailRoute(navController = navController)
                 }
 
 

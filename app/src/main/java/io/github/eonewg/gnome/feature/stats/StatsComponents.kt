@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.ui.page.stats
+package io.github.eonewg.gnome.feature.stats
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background

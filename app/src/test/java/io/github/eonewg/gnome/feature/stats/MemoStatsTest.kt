@@ -1,6 +1,6 @@
-package io.github.eonewg.gnome.ui.page.stats
+package io.github.eonewg.gnome.feature.stats
 
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -83,12 +83,8 @@ class MemoStatsTest {
         assertEquals(listOf(1, 0), chartAxisTicks(emptyList()))
     }
 
-    private fun memo(id: String, content: String, instant: String) = MemoEntity(
-        identifier = id,
-        accountKey = "test",
-        content = content,
+    private fun memo(id: String, content: String, instant: String) = MemoStatsInput(
         date = Instant.parse(instant),
-        visibility = MemoVisibility.PRIVATE,
-        pinned = false,
+        content = content,
     )
 }
