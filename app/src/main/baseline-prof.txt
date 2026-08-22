@@ -1,10 +1,6 @@
 HSPLio/github/eonewg/gnome/GnomeApp;->**(**)**
 HSPLio/github/eonewg/gnome/MainActivity;->**(**)**
 HSPLio/github/eonewg/gnome/ui/page/memos/QuickMemoLaunchPageKt;->**(**)**
-HSPLio/github/eonewg/gnome/ui/page/memoinput/MemoInputPageKt;->**(**)**
 HSPLio/github/eonewg/gnome/ui/page/memoinput/MemoInputComponentsKt;->**(**)**
 HSPLio/github/eonewg/gnome/ui/page/memoinput/HashtagAutocompleteKt;->**(**)**
 HSPLio/github/eonewg/gnome/ui/theme/ThemeKt;->**(**)**
-HSPLio/github/eonewg/gnome/viewmodel/UserStateViewModel;->**(**)**
-HSPLio/github/eonewg/gnome/viewmodel/MemosViewModel;->**(**)**
-HSPLio/github/eonewg/gnome/viewmodel/MemoInputViewModel;->**(**)**
