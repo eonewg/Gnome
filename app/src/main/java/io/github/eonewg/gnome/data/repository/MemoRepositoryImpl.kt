@@ -24,7 +24,7 @@ import io.github.eonewg.gnome.sync.SyncEngine
 import io.github.eonewg.gnome.sync.SyncFileStore
 import io.github.eonewg.gnome.sync.SyncScheduler
 import io.github.eonewg.gnome.ext.getErrorMessage
-import io.github.eonewg.gnome.util.extractCustomTags
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -218,7 +218,7 @@ class MemoRepositoryImpl(
         return try {
             val localTags = localData.getTimeline(accountKeyValue)
                 .asSequence()
-                .flatMap { extractCustomTags(it.content).asSequence() }
+                .flatMap { MemosTagParser.extractTags(it.content).asSequence() }
                 .filter { it.isNotBlank() }
                 .toSet()
             // Remote accounts refresh the tag list from the Memos instance

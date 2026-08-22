@@ -37,8 +37,7 @@ import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.media.MediaViewerActivity
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.viewmodel.LocalUserState
-import io.github.eonewg.gnome.util.findCustomTagMatches
-import io.github.eonewg.gnome.util.getCustomTagName
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -139,22 +138,21 @@ private fun PlainMemoText(
     val annotatedText = remember(text, tagStyle, linkListener) {
         buildAnnotatedString {
             var cursor = 0
-            findCustomTagMatches(text).forEach { match ->
-                val start = match.range.first
-                val endExclusive = match.range.last + 1
+            MemosTagParser.scanTagOccurrences(text).forEach { occurrence ->
+                val start = occurrence.start
+                val endExclusive = occurrence.endExclusive
                 if (start > cursor) {
                     append(text.substring(cursor, start))
                 }
-                val tag = getCustomTagName(match)
                 withLink(
                     LinkAnnotation.Url(
-                        url = PlainTagLinkPrefix + Uri.encode(tag),
+                        url = PlainTagLinkPrefix + Uri.encode(occurrence.value),
                         styles = tagStyle,
                         linkInteractionListener = linkListener,
                     )
                 ) {
                     append("\u2009")
-                    append(match.value)
+                    append(text.substring(start, endExclusive))
                     append("\u2009")
                 }
                 cursor = endExclusive

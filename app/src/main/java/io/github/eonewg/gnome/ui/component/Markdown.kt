@@ -38,9 +38,7 @@ import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.model.markdownAnnotatorConfig
 import com.mikepenz.markdown.model.rememberMarkdownState
 import com.mikepenz.markdown.utils.getUnescapedTextInNode
-import io.github.eonewg.gnome.util.findCustomTagMatches
-import io.github.eonewg.gnome.util.getCustomTagName
-import io.github.eonewg.gnome.util.isCustomTagSupportedNode
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import org.intellij.markdown.MarkdownTokenTypes
 import com.mikepenz.markdown.m3.Markdown as M3Markdown
@@ -129,35 +127,33 @@ fun Markdown(
                     if (child.type != MarkdownTokenTypes.TEXT) {
                         return@markdownAnnotator false
                     }
-                    if (!isCustomTagSupportedNode(child)) {
+                    if (!MemosTagParser.isTagEligibleNode(child)) {
                         return@markdownAnnotator false
                     }
                     val source = child.getUnescapedTextInNode(content)
-                    val tags = findCustomTagMatches(source).toList()
+                    val tags = MemosTagParser.scanTagOccurrences(source)
                     if (tags.isEmpty()) {
                         return@markdownAnnotator false
                     }
 
                     var cursor = 0
-                    tags.forEach { match ->
-                        val start = match.range.first
-                        val endInclusive = match.range.last
+                    tags.forEach { occurrence ->
+                        val start = occurrence.start
                         if (start > cursor) {
                             append(source.substring(cursor, start))
                         }
-                        val tagRaw = getCustomTagName(match)
                         withLink(
                             LinkAnnotation.Url(
-                                url = TAG_LINK_PREFIX + Uri.encode(tagRaw),
+                                url = TAG_LINK_PREFIX + Uri.encode(occurrence.value),
                                 styles = tagLinkStyle,
                                 linkInteractionListener = tagLinkListener
                             )
                         ) {
                             append("\u2009")
-                            append(match.value)
+                            append(source.substring(occurrence.start, occurrence.endExclusive))
                             append("\u2009")
                         }
-                        cursor = endInclusive + 1
+                        cursor = occurrence.endExclusive
                     }
                     if (cursor < source.length) {
                         append(source.substring(cursor))

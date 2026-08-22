@@ -21,7 +21,7 @@ import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.suspendOnErrorMessage
 import io.github.eonewg.gnome.ui.page.memoinput.restorableMemoInputDraft
-import io.github.eonewg.gnome.util.extractCustomTags
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import io.github.eonewg.gnome.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -79,7 +79,7 @@ class EditorViewModel @Inject constructor(
             // pull the server's tag list once per editor session.
             memoService.domainMemos.collect { memos ->
                 val localTags = memos.asSequence()
-                    .flatMap { extractCustomTags(it.content).asSequence() }
+                    .flatMap { MemosTagParser.extractTags(it.content).asSequence() }
                     .filter { it.isNotBlank() }
                     .toSet()
                 _uiState.update { it.copy(tags = (localTags + remoteTags).sorted()) }

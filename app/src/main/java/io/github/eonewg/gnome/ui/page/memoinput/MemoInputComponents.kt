@@ -97,7 +97,7 @@ import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.InputImage
 import io.github.eonewg.gnome.ui.component.toResourceRepresentable
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
-import io.github.eonewg.gnome.util.findCustomTagMatches
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -317,11 +317,11 @@ internal fun MemoInputEditor(
         VisualTransformation { source ->
             val highlighted = buildAnnotatedString {
                 append(source)
-                findCustomTagMatches(source.text).forEach { match ->
+                MemosTagParser.scanTagOccurrences(source.text).forEach { occurrence ->
                     addStyle(
                         style = SpanStyle(color = colors.tagForeground),
-                        start = match.range.first,
-                        end = match.range.last + 1,
+                        start = occurrence.start,
+                        end = occurrence.endExclusive,
                     )
                 }
             }

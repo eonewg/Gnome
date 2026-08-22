@@ -39,7 +39,7 @@ import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.data.account.SyncCompatibility
 import io.github.eonewg.gnome.ext.getErrorMessage
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.util.extractCustomTags
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import io.github.eonewg.gnome.widget.WidgetUpdater
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -104,7 +104,7 @@ class MemosViewModel @Inject constructor(
                 val matrix = calculateMatrix(snapshot)
                 val tags = snapshot
                     .asSequence()
-                    .flatMap { extractCustomTags(it.content).asSequence() }
+                    .flatMap { MemosTagParser.extractTags(it.content).asSequence() }
                     .filter { it.isNotBlank() }
                     .distinct()
                     .sorted()

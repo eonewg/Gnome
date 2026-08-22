@@ -18,7 +18,7 @@ import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.ext.getErrorMessage
-import io.github.eonewg.gnome.util.extractCustomTags
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import io.github.eonewg.gnome.viewmodel.ManualSyncResult
 import io.github.eonewg.gnome.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
@@ -88,7 +88,7 @@ class TimelineViewModel @Inject constructor(
         if (_uiState.value.memos != snapshot) {
             val preparedTags = withContext(Dispatchers.Default) {
                 snapshot.asSequence()
-                    .flatMap { extractCustomTags(it.content).asSequence() }
+                    .flatMap { MemosTagParser.extractTags(it.content).asSequence() }
                     .filter { it.isNotBlank() }
                     .distinct()
                     .sorted()
@@ -241,7 +241,7 @@ class TimelineViewModel @Inject constructor(
             setBatchRunning(true)
             var failedCount = 0
             targets.forEach { memo ->
-                if (tag !in extractCustomTags(memo.content)) {
+                if (tag !in MemosTagParser.extractTags(memo.content)) {
                     val updatedContent = if (memo.content.isBlank()) {
                         "#$tag"
                     } else {
