@@ -31,6 +31,7 @@ import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoService
+import io.github.eonewg.gnome.data.account.SyncCompatibility
 import io.github.eonewg.gnome.ext.getErrorMessage
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.util.extractCustomTags
@@ -113,7 +114,7 @@ class MemosViewModel @Inject constructor(
     suspend fun loadMemos(syncAfterLoad: Boolean = true) = withContext(viewModelScope.coroutineContext) {
         if (syncAfterLoad) {
             val compatibility = accountService.checkCurrentAccountSyncCompatibility(isAutomatic = true)
-            if (compatibility !is AccountService.SyncCompatibility.Allowed) {
+            if (compatibility !is SyncCompatibility.Allowed) {
                 return@withContext
             }
 
@@ -133,18 +134,18 @@ class MemosViewModel @Inject constructor(
             isAutomatic = false,
             allowHigherV1Version = allowHigherV1Version
         )) {
-            is AccountService.SyncCompatibility.Blocked -> {
+            is SyncCompatibility.Blocked -> {
                 return@withContext ManualSyncResult.Blocked(
                     compatibility.message ?: MemosVersionSupport.supportedVersionsMessage(appContext)
                 )
             }
-            is AccountService.SyncCompatibility.RequiresConfirmation -> {
+            is SyncCompatibility.RequiresConfirmation -> {
                 return@withContext ManualSyncResult.RequiresConfirmation(
                     version = compatibility.version,
                     message = compatibility.message
                 )
             }
-            AccountService.SyncCompatibility.Allowed -> Unit
+            SyncCompatibility.Allowed -> Unit
         }
 
         val syncResult = memoService.sync(true)

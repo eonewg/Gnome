@@ -4,28 +4,23 @@ import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
-import com.skydoves.sandwich.getOrNull
-import com.skydoves.sandwich.getOrThrow
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.data.account.AccountStore
+import io.github.eonewg.gnome.data.account.LoginCompatibility
 import io.github.eonewg.gnome.data.account.MemosClientFactory
 import io.github.eonewg.gnome.data.account.RemoteDataSourceFactory
+import io.github.eonewg.gnome.data.account.ServerCompatibilityChecker
+import io.github.eonewg.gnome.data.account.SyncCompatibility
 import io.github.eonewg.gnome.data.api.MemosV0Api
 import io.github.eonewg.gnome.data.api.MemosV1Api
-import io.github.eonewg.gnome.data.constant.MemosVersionSupport
-import io.github.eonewg.gnome.data.constant.MemosVersionSupport.MEMOS_V0_MIN_VERSION
-import io.github.eonewg.gnome.data.constant.MemosVersionSupport.MEMOS_V1_MAX_VERSION
-import io.github.eonewg.gnome.data.constant.MemosVersionSupport.MEMOS_V1_MIN_VERSION
 import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.GnomeDatabase
 import io.github.eonewg.gnome.data.local.LocalMemoDataSource
@@ -33,14 +28,11 @@ import io.github.eonewg.gnome.data.local.RoomTransactionRunner
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.LocalAccount
-import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.data.repository.MemoRepository
-import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.sync.SyncScheduler
-import net.swiftzer.semver.SemVer
 import okhttp3.OkHttpClient
 import java.io.File
 import java.time.Instant
@@ -62,34 +54,8 @@ class AccountService @Inject constructor(
     private val accountStore: AccountStore,
     private val memosClientFactory: MemosClientFactory,
     private val remoteDataSourceFactory: RemoteDataSourceFactory,
+    private val compatibilityChecker: ServerCompatibilityChecker,
 ) {
-    sealed class LoginCompatibility {
-        data class Supported(val accountCase: UserData.AccountCase) : LoginCompatibility()
-        data class Unsupported(val message: String) : LoginCompatibility()
-        data class RequiresConfirmation(
-            val accountCase: UserData.AccountCase,
-            val version: String,
-            val message: String,
-        ) : LoginCompatibility()
-    }
-
-    sealed class SyncCompatibility {
-        object Allowed : SyncCompatibility()
-        data class Blocked(val message: String?) : SyncCompatibility()
-        data class RequiresConfirmation(val version: String, val message: String) : SyncCompatibility()
-    }
-
-    private data class ServerVersionInfo(
-        val accountCase: UserData.AccountCase,
-        val version: String,
-    )
-
-    private enum class VersionPolicy {
-        SUPPORTED,
-        TOO_LOW,
-        V1_HIGHER,
-    }
-
     private val exportDateFormatter: DateTimeFormatter = DateTimeFormatter
         .ofPattern("yyyyMMdd-HHmmss", Locale.US)
         .withZone(ZoneId.systemDefault())
@@ -317,22 +283,7 @@ class AccountService @Inject constructor(
     }
 
     suspend fun checkLoginCompatibility(host: String, allowHigherV1Version: Boolean = false): LoginCompatibility {
-        val serverVersion = detectAccountCaseAndVersion(host)
-        return when (evaluateVersionPolicy(serverVersion)) {
-            VersionPolicy.SUPPORTED -> LoginCompatibility.Supported(serverVersion.accountCase)
-            VersionPolicy.TOO_LOW -> LoginCompatibility.Unsupported(MemosVersionSupport.supportedVersionsMessage(context))
-            VersionPolicy.V1_HIGHER -> {
-                if (allowHigherV1Version) {
-                    LoginCompatibility.Supported(serverVersion.accountCase)
-                } else {
-                    LoginCompatibility.RequiresConfirmation(
-                        accountCase = serverVersion.accountCase,
-                        version = serverVersion.version,
-                        message = R.string.memos_login_version_higher_warning.string,
-                    )
-                }
-            }
-        }
+        return compatibilityChecker.checkLoginCompatibility(host, allowHigherV1Version)
     }
 
     suspend fun checkCurrentAccountSyncCompatibility(
@@ -341,46 +292,7 @@ class AccountService @Inject constructor(
     ): SyncCompatibility {
         awaitInitialization()
         val account = currentAccount.first() ?: return SyncCompatibility.Allowed
-        if (account !is Account.MemosV0 && account !is Account.MemosV1) {
-            return SyncCompatibility.Allowed
-        }
-
-        val serverVersion = fetchVersionForAccount(account)
-            ?: return if (isAutomatic) {
-                SyncCompatibility.Blocked(null)
-            } else {
-                SyncCompatibility.Blocked(MemosVersionSupport.supportedVersionsMessage(context))
-            }
-        return when (evaluateVersionPolicy(serverVersion)) {
-            VersionPolicy.SUPPORTED -> SyncCompatibility.Allowed
-            VersionPolicy.TOO_LOW -> {
-                if (isAutomatic) {
-                    SyncCompatibility.Blocked(null)
-                } else {
-                    SyncCompatibility.Blocked(MemosVersionSupport.supportedVersionsMessage(context))
-                }
-            }
-            VersionPolicy.V1_HIGHER -> {
-                val accepted = accountStore.isUnsupportedSyncVersionAccepted(account.accountKey(), serverVersion.version)
-                if (isAutomatic) {
-                    return if (accepted) {
-                        SyncCompatibility.Allowed
-                    } else {
-                        SyncCompatibility.Blocked(null)
-                    }
-                }
-                if (allowHigherV1Version == serverVersion.version) {
-                    return SyncCompatibility.Allowed
-                }
-                if (accepted) {
-                    return SyncCompatibility.Allowed
-                }
-                SyncCompatibility.RequiresConfirmation(
-                    version = serverVersion.version,
-                    message = R.string.memos_sync_version_higher_warning.string,
-                )
-            }
-        }
+        return compatibilityChecker.checkAccountSyncCompatibility(account, isAutomatic, allowHigherV1Version)
     }
 
     suspend fun rememberAcceptedUnsupportedSyncVersion(version: String) {
@@ -390,7 +302,7 @@ class AccountService @Inject constructor(
     }
 
     suspend fun detectAccountCase(host: String): UserData.AccountCase {
-        return detectAccountCaseAndVersion(host).accountCase
+        return compatibilityChecker.detectAccountCase(host)
     }
 
     suspend fun getRepository(): AbstractMemoRepository {
@@ -407,75 +319,7 @@ class AccountService @Inject constructor(
         }
     }
 
-    private suspend fun detectAccountCaseAndVersion(host: String): ServerVersionInfo {
-        val memosV0Status = createMemosV0Client(host, null).second.status().getOrNull()
-        val memosV0Version = memosV0Status?.profile?.version?.trim().orEmpty()
-        if (memosV0Version.isNotEmpty()) {
-            return ServerVersionInfo(UserData.AccountCase.MEMOS_V0, memosV0Version)
-        }
-
-        val memosV1Profile = createMemosV1Client(host, null).second.getProfile().getOrThrow()
-        val memosV1Version = memosV1Profile.version.trim()
-        if (memosV1Version.isNotEmpty()) {
-            return ServerVersionInfo(UserData.AccountCase.MEMOS_V1, memosV1Version)
-        }
-
-        return ServerVersionInfo(UserData.AccountCase.ACCOUNT_NOT_SET, "")
-    }
-
-    private suspend fun fetchVersionForAccount(account: Account): ServerVersionInfo? {
-        return when (account) {
-            is Account.MemosV0 -> {
-                val version = memosClientFactory.createV0Client(account.info.host, account.info.accessToken)
-                    .second
-                    .status()
-                    .getOrNull()
-                    ?.profile
-                    ?.version
-                    ?.trim()
-                    .orEmpty()
-                if (version.isBlank()) null else ServerVersionInfo(UserData.AccountCase.MEMOS_V0, version)
-            }
-            is Account.MemosV1 -> {
-                val version = memosClientFactory.createV1Client(account.info.host, account.info.accessToken)
-                    .second
-                    .getProfile()
-                    .getOrNull()
-                    ?.version
-                    ?.trim()
-                    .orEmpty()
-                if (version.isBlank()) null else ServerVersionInfo(UserData.AccountCase.MEMOS_V1, version)
-            }
-            else -> null
-        }
-    }
-
     private suspend fun awaitInitialization() {
         initialization.await()
-    }
-
-    private fun evaluateVersionPolicy(serverVersion: ServerVersionInfo): VersionPolicy {
-        val versionName = serverVersion.version.trim()
-        val version = SemVer.parseOrNull(versionName)
-        return when (serverVersion.accountCase) {
-            UserData.AccountCase.MEMOS_V0 -> {
-                when {
-                    versionName.isEmpty() -> VersionPolicy.TOO_LOW
-                    version == null -> VersionPolicy.SUPPORTED
-                    version < MEMOS_V0_MIN_VERSION -> VersionPolicy.TOO_LOW
-                    else -> VersionPolicy.SUPPORTED
-                }
-            }
-            UserData.AccountCase.MEMOS_V1 -> {
-                when {
-                    versionName.isEmpty() -> VersionPolicy.TOO_LOW
-                    version == null -> VersionPolicy.V1_HIGHER
-                    version < MEMOS_V1_MIN_VERSION -> VersionPolicy.TOO_LOW
-                    version > MEMOS_V1_MAX_VERSION -> VersionPolicy.V1_HIGHER
-                    else -> VersionPolicy.SUPPORTED
-                }
-            }
-            else -> VersionPolicy.TOO_LOW
-        }
     }
 }

@@ -26,6 +26,7 @@ import io.github.eonewg.gnome.data.model.MemosAccount
 import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.service.AccountService
+import io.github.eonewg.gnome.data.account.LoginCompatibility as ServiceLoginCompatibility
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.suspendOnNotLogin
 import okhttp3.OkHttpClient
@@ -74,9 +75,9 @@ class UserStateViewModel @Inject constructor(
     suspend fun checkLoginCompatibility(host: String): LoginCompatibility = withContext(viewModelScope.coroutineContext) {
         try {
             when (val compatibility = accountService.checkLoginCompatibility(host)) {
-                is AccountService.LoginCompatibility.Supported -> LoginCompatibility.Supported
-                is AccountService.LoginCompatibility.Unsupported -> LoginCompatibility.Unsupported(compatibility.message)
-                is AccountService.LoginCompatibility.RequiresConfirmation -> LoginCompatibility.RequiresConfirmation(compatibility.message)
+                is ServiceLoginCompatibility.Supported -> LoginCompatibility.Supported
+                is ServiceLoginCompatibility.Unsupported -> LoginCompatibility.Unsupported(compatibility.message)
+                is ServiceLoginCompatibility.RequiresConfirmation -> LoginCompatibility.RequiresConfirmation(compatibility.message)
             }
         } catch (e: Throwable) {
             LoginCompatibility.Unsupported(e.localizedMessage ?: e.message ?: "")
@@ -92,11 +93,11 @@ class UserStateViewModel @Inject constructor(
         try {
             val compatibility = accountService.checkLoginCompatibility(host, allowHigherV1Version)
             val accountCase = when (compatibility) {
-                is AccountService.LoginCompatibility.Supported -> compatibility.accountCase
-                is AccountService.LoginCompatibility.Unsupported -> {
+                is ServiceLoginCompatibility.Supported -> compatibility.accountCase
+                is ServiceLoginCompatibility.Unsupported -> {
                     return@withContext ApiResponse.exception(GnomeException(compatibility.message))
                 }
-                is AccountService.LoginCompatibility.RequiresConfirmation -> {
+                is ServiceLoginCompatibility.RequiresConfirmation -> {
                     return@withContext ApiResponse.exception(GnomeException(compatibility.message))
                 }
             }
