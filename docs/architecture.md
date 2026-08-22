@@ -39,15 +39,20 @@ io.github.eonewg.gnome
 依赖方向：`feature → (repository / sync status) → (data.local / data.remote) / sync`。
 feature 不感知 MemosV0/V1、Room schema、Repository 实现细节。
 
-进度注记（2026-08-22，Phase 12 完成）：`core/model`、`data/local/LocalMemoDataSource`、
+进度注记（2026-08-22，Phase 16 完成）：`core/model`、`data/local/LocalMemoDataSource`、
 `data/remote(/memos)`、`data/account`（AccountStore / AccountSession / 客户端与数据源
 工厂 / ServerCompatibilityChecker / AccountExportService，AccountService 仅剩门面）、
 domain 契约 `data/repository/MemoRepository`（core.model 出参，`MemoRepositoryImpl`
 同时保留 entity adapter）与 sync 层均已落地。feature 层 `feature/timeline`
-（TimelineRoute/ViewModel/UiState/Screen）与 `feature/editor`
-（EditorRoute/ViewModel/UiState/Screen，四个入口共享同一核心）已上线并迁到
-domain 模型；legacy 页面（Search/Tag/Date/Detail/Stats 等）仍经 LocalMemos
-entity 桥接，待 Phase 15/16 收口。详见 [refactor-plan.md](refactor-plan.md)。
+（TimelineRoute/ViewModel/UiState/Screen）、`feature/editor`
+（EditorRoute/ViewModel/UiState/Screen，四个入口共享同一核心）、`feature/tag`
+（Room 标签索引 + 编辑器自动补全）、`feature/search`（Room LIKE 搜索）、
+`feature/stats`、`feature/memo`（MemoDetail/QuickMemo）、`feature/drawer`
+（抽屉统计/热力图/标签）、`feature/account`（AccountSessionViewModel）均已上线；
+卡片交互由宿主页面的 `MemoCardActions` 提供。业务 CompositionLocal 全部移除
+（LocalMemos / LocalUserState / LocalRootNavController / LocalArchivedMemos），
+legacy VM（MemosViewModel / UserStateViewModel）已删除；单 memo 写操作统一经
+`data/service/MemoActions` 委托 MemoRepository。详见 [refactor-plan.md](refactor-plan.md)。
 
 ## 数据与同步模型
 

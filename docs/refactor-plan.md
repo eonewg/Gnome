@@ -94,9 +94,9 @@
 - Partial：SyncingRepository / LocalDatabaseRepository 已随 Phase 5 删除；
   Phase 10 已建立 domain 契约 `interface MemoRepository`（core.model 出参），
   `MemoRepositoryImpl` 同时实现两者，旧 entity 接口仅作迁移 adapter。
-  剩余 entity 调用方：MemosViewModel（legacy 页面桥）、MemoDetailPage、
-  ArchivedMemoPage、ExploreList、ResourceListPage、UserStateViewModel——
-  随 Phase 15/16 页面迁移逐步收窄后移除。
+  剩余 entity 调用方：ArchivedMemoListViewModel、ExploreList、ResourceListPage——
+  随 Phase 17/18 页面迁移逐步收窄后移除（MemosViewModel / MemoDetailPage /
+  ArchivedMemoPage / UserStateViewModel 已随 Phase 16 迁走）。
 
 ### Phase 10 — 拆分 AccountService
 - **Done**（4 commits：c03428ed / 4d54ed0e / 2a3d8e79 / 985db918 + b1a6d936 微调）
@@ -152,17 +152,43 @@
     保存确认对话框、焦点/键盘、quick activity finish 行为保持。
 
 ### Phase 13 — Tag Parser + Tag Index
-- Deferred：`MemosTagParser` 统一全 App 标签语义（先核对最新 Memos server 行为）；
-  `memo_tags` Room 索引表 + 事务维护；autocomplete / drawer / filter / stats 全部走索引。
+- **Done**（3 commits：b3057797 / f0df3eb8 / f99ea7f2）：
+  - `core/tag/MemosTagParser` 统一全 App 标签语义，按最新 Memos ADR 0001
+    "Tag Syntax and Recognition"（XID_Continue + `-`/`+`/`&` 扩展、apostrophe
+    joiner、slash 层级隐式祖先、RGI emoji、无左边界）；raw 全文扫描 +
+    introducer 位置 AST 校验，抵御 lexer token 切分（如 `#tag's`）。
+  - `memo_tags` Room 表（accountKey/memoId/tag 复合主键 + (accountKey, tag) 索引），
+    schema v3 + `MIGRATION_2_3`（回填解析结果）+ androidTest MigrationTest；
+    所有写路径维护索引（upsert/替换/本地创建/删除/归档）。
+  - TagDao：frequency DESC + tag ASC 聚合、`ESCAPE '\'` 前缀匹配、IN 子查询精确匹配。
+  - Editor autocomplete 改走 Room 索引（EditorViewModel 订阅 observeTagsFlow）。
 
 ### Phase 14 — Room Search
-- Deferred：搜索进 Room（首版 LIKE，保证中文 substring），Repository 暴露 searchMemos。
+- **Done**（commit 57a67e98）：
+  - `feature/search/`：SearchRoute/ViewModel/UiState/Screen；`observeSearch`
+    `LIKE '%' || :q || '%'`（CJK 友好）+ archived/tag/date 过滤 + `ESCAPE '\'`。
+  - MemosList 内存 `content.contains` / tag contains 过滤移除；不用 FTS。
 
 ### Phase 15 — Stats Data Layer
-- Deferred：StatsViewModel + 数据层读取，复用现有 calculateMemoStats。
+- **Done**（commit 47f89652）：`feature/stats/` StatsRoute/ViewModel/UiState/Screen 复用
+  `MemoStats.calculateMemoStats`（泛化为 `List<MemoStatsInput>`），数据来自
+  Repository/Room Flow；不建统计表；视觉与交互保持。
 
 ### Phase 16 — 减少业务 CompositionLocal
-- Deferred：移除 LocalMemos / LocalUserState / LocalRootNavController 全局暴露。
+- **Done**（commit b348b183）：
+  - 删除 LocalMemos / LocalUserState / LocalRootNavController / LocalArchivedMemos
+    与 MemosViewModel / UserStateViewModel（ManualSyncResult 移入 feature/timeline）。
+  - 卡片交互收进 `MemoCardActions`（open/edit/pin/archive/delete/updateContent/
+    cacheResource/downloadAndCache）由宿主页面提供；MemosCard/MemosList/
+    MemoContent/MemoImage/Attachment 纯组件化；卡片点击恢复跳 MEMO_DETAIL
+    （参数化过渡期曾丢失）。
+  - 新 VM：DrawerViewModel（抽屉统计/热力图/标签走 Room 流）、DateMemoViewModel、
+    MemoDetailViewModel（SavedStateHandle memoId + 活 memo 流）、QuickMemoViewModel、
+    AccountSessionViewModel（账户会话门面）+ 共享 `data/service/MemoActions`
+    （单 memo 写操作统一委托 MemoRepository）。
+  - Login 组装迁入 AccountService；EditorRoute 以 navController 参数取代
+    CompositionLocal；MainActivity/QuickMemoActivity 不再提供 VM。
+  - 验证：129 单测全绿，assembleDebug + assembleRelease 通过。
 
 ### Phase 17 — Navigation 重构
 - Deferred：单独提交，评估 Navigation 3 typed key。
