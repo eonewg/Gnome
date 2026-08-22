@@ -6,7 +6,7 @@
 
 - **Gnome** 以 [mudkipme/MoeMemosAndroid](https://github.com/mudkipme/MoeMemosAndroid) 为基座参考与灵感来源，GPLv3，对 memos 和 MoeMemos 保持致谢（见 README）。对外定位：**跟随 Memos 最新稳定版适配**，不锁定旧版本窗口。
 - 远程仓库：`origin` = eonewg/Gnome（默认分支 `custom-memos`）；`upstream` = mudkipme/MoeMemosAndroid（仅用于同步上游，禁止 push）。
-- 定制需求全文见 `moe_memos_android_custom_prompt.md`；flomo 迁移工具见 `migration/`。
+- 定制与架构重构需求见 `Gnome_Android_Refactor_Prompt.md`；架构与重构进度见 `docs/architecture.md`、`docs/refactor-plan.md`；flomo 迁移工具见 `migration/`。
 - 服务端兼容目标：跟随 Memos 最新稳定版（当前适配至 0.30.x；另支持 0.21.0 与 0.27.0 – 0.30.0，0.22 – 0.26 不支持）。Memos 发新稳定版时优先跟进适配。
 
 ## 版本与发布
