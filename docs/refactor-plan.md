@@ -212,7 +212,7 @@
   - 验证：129 单测全绿，assembleDebug + assembleRelease 通过。
 
 ### Phase 17 — Navigation 3 Migration
-- **Done**（commit pending，Navigation 3 1.1.6）：
+- **Done**（commit dc29e9c6 + dd3d6bc1，Navigation 3 1.1.6）：
   - 依赖：`navigation3-runtime:1.1.6` + `navigation3-ui:1.1.6` + `lifecycle-viewmodel-navigation3`
     （entry 级 ViewModelStore + SavedStateHandle），删除 `navigation-compose:2.9.7`，
     并对 `hilt-navigation-compose`（1.3.0 把 nav2 声明为 API 依赖）exclude
@@ -326,7 +326,7 @@
   7. 不修改：Navigation 3、SyncEngine、Outbox、Tag/Search/Stats、主界面、gradle
      模块化、QuickMemoActivity 保留、不为 widget 建立第二套数据架构。
   8. 验证：testDebugUnitTest + assembleDebug + assembleRelease，单独 Phase 18 commit。
-- **Done**（commit pending）：
+- **Done**（commit 2e4a27d6）：
   - Widget 数据源迁移：`GnomeGlanceWidget` / `MemoryGlanceWidget` / 配置页改走
     `MemoService.getMemoRepository()` + `observeTimeline().first()`（Room 快照，
     离线可渲染），渲染与选择逻辑消费 `core.model.Memo`；过滤/排序/截断/内存随机
