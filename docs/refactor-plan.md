@@ -234,12 +234,34 @@
   - 删除：MemosPage.kt / MemosNavigation.kt / RouteName.kt / NavControllerExt.kt。
   - 测试：新增 `nav/GnomeNavigatorTest` 16 用例（rapid back、中文与斜杠 tag
     `#408/计网`、memoId 特殊字符不经编码、date ISO roundtrip、login/logout
-    reset、popUpTo 语义），145 单测全绿 + assembleDebug + assembleRelease 通过。
+    reset、popUpTo 语义）；Phase 17 修正补齐 `feature/memo/MemoDetailViewModelTest`
+    4 用例（setMemoId 幂等/切换/未知 id），149 单测全绿 + assembleDebug +
+    assembleRelease 通过。
   - Deep links：Manifest 无 URL deep link（仅 SEND/SEND_MULTIPLE/QS Tile/AppWidget
     intent-filter），intent action 处理迁到 typed key 导航；record “不适用”。
-  - 已知残余差异：进程死亡后 Timeline sortOrder/Editor 未提交文本（SavedStateHandle
-    初始值）不再恢复（Nav3 不注入 nav 参数），属可接受边缘差异；NavDisplay 渲染
-    层（动画/手势/登录流）仍需真机 smoke。
+  - **Phase 17 修正（Hilt / NavEntry saved state）**：
+    - Hilt 集成换用 `androidx.hilt:hilt-lifecycle-viewmodel-compose:1.3.0`
+      （`hiltViewModel()` 现从该工件发布，`androidx.hilt.lifecycle.viewmodel.compose`
+      包；旧 `hilt-navigation-compose` 依赖 Navigation 2，已移除且不再需要
+      exclude hack）——dependency tree：Navigation 2 = 0、hilt-navigation-compose = 0、
+      hilt-lifecycle-viewmodel-compose present、navigation3-runtime/ui = 1.1.6。
+    - NavDisplay entryDecorators 顺序确认：`rememberSaveableStateHolderNavEntryDecorator`
+      在前、`rememberViewModelStoreNavEntryDecorator` 在后——每个 NavEntry 独立
+      ViewModelStoreOwner（按 contentKey 隔离），SavedStateHandle 由 SaveableStateHolder
+      提供的 entry-scoped SavedStateRegistry 支撑。
+    - SavedStateHandle 恢复链验证（替代先前“不恢复”的错误结论）：Android 端
+      `removeViewModelStoreOnPop` 默认 `{ activity?.isChangingConfigurations != true }`
+      ——普通 pop 会 clear 该 entry 的 ViewModelStore（MemoDetail/Editor 的 VM 随
+      back 释放），config change 期间不 clear（EntryViewModel 存于 Activity store，
+      经 NonConfigurationInstance 存活，Timeline 实例与状态保持）；进程死亡后
+      `rememberNavBackStack` 恢复 key、SaveableStateHolder 恢复 entry saved state、
+      新 VM 从 SavedStateHandle 恢复 sortOrder/未提交文本。Timeline/Editor 的
+      SaveableStateHandle 读写契约由既有单测锁定（recreation 恢复用例）；Nav3
+      不注入的是导航参数（memoId 等），已由 Route 显式注入替代：MemoDetail
+      `LaunchedEffect(memoIdentifier)` + `setMemoId`（幂等，flow 去重），Editor
+      `start()` 幂等（initialized guard，不覆盖恢复值）。
+    - 仍需真机 smoke：NavDisplay 动画/手势、登录流、配置变更与进程死亡的
+      entry 状态（automated instrumentation 需设备环境）。
 
 ### Phase 18 — Widget / Quick Capture 架构清理
 - Deferred。

@@ -119,12 +119,10 @@ dependencies {
 
     implementation "com.google.dagger:hilt-android:$hilt_version"
     ksp "com.google.dagger:hilt-compiler:$hilt_version"
-    implementation("androidx.hilt:hilt-navigation-compose:$hilt_navigation_compose_version") {
-        // hilt-navigation-compose 1.3.0 declares an API dependency on Navigation 2,
-        // but hiltViewModel() only needs lifecycle-viewmodel-compose. Gnome is fully
-        // on Navigation 3, so drop the legacy artifact.
-        exclude group: "androidx.navigation", module: "navigation-compose"
-    }
+    // hiltViewModel() is published from the lifecycle ViewModel artifact; the
+    // legacy hilt-navigation-compose variant depends on Navigation 2 and is
+    // deprecated on it, so Gnome (fully Navigation 3) uses the current one.
+    implementation "androidx.hilt:hilt-lifecycle-viewmodel-compose:$hilt_lifecycle_viewmodel_compose_version"
     implementation "androidx.biometric:biometric:$biometric_version"
 
     implementation "androidx.datastore:datastore:$datastore"
