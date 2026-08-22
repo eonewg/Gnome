@@ -6,7 +6,6 @@ import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import com.skydoves.sandwich.getOrNull
 import com.skydoves.sandwich.getOrThrow
-import com.skydoves.sandwich.retrofit.adapters.ApiResponseCallAdapterFactory
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -17,8 +16,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.Json
 import io.github.eonewg.gnome.R
+import io.github.eonewg.gnome.data.account.MemosClientFactory
+import io.github.eonewg.gnome.data.account.RemoteDataSourceFactory
 import io.github.eonewg.gnome.data.api.MemosV0Api
 import io.github.eonewg.gnome.data.api.MemosV1Api
 import io.github.eonewg.gnome.data.constant.MemosVersionSupport
@@ -36,20 +36,13 @@ import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.model.UserSettings
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
-import io.github.eonewg.gnome.data.remote.memos.MemosV0RemoteDataSource
-import io.github.eonewg.gnome.data.remote.memos.MemosV1RemoteDataSource
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.sync.SyncScheduler
 import net.swiftzer.semver.SemVer
-import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import retrofit2.Retrofit
-import retrofit2.converter.kotlinx.serialization.asConverterFactory
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -68,6 +61,8 @@ class AccountService @Inject constructor(
     private val fileStorage: FileStorage,
     private val secureTokenStorage: SecureTokenStorage,
     private val syncScheduler: SyncScheduler,
+    private val memosClientFactory: MemosClientFactory,
+    private val remoteDataSourceFactory: RemoteDataSourceFactory,
 ) {
     sealed class LoginCompatibility {
         data class Supported(val accountCase: UserData.AccountCase) : LoginCompatibility()
@@ -99,12 +94,6 @@ class AccountService @Inject constructor(
     private val exportDateFormatter: DateTimeFormatter = DateTimeFormatter
         .ofPattern("yyyyMMdd-HHmmss", Locale.US)
         .withZone(ZoneId.systemDefault())
-
-    private val networkJson = Json {
-        ignoreUnknownKeys = true
-        coerceInputValues = true
-        explicitNulls = false
-    }
 
     @Volatile
     var httpClient: OkHttpClient = okHttpClient
@@ -154,19 +143,12 @@ class AccountService @Inject constructor(
                 this.remoteRepository = null
                 httpClient = okHttpClient
             }
-            is Account.MemosV0 -> {
-                val (client, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
-                val remote = MemosV0RemoteDataSource(memosApi, account)
-                this.repository = buildMemoRepository(remote, account)
-                this.remoteRepository = remote
-                this.httpClient = client
-            }
-            is Account.MemosV1 -> {
-                val (client, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
-                val remote = MemosV1RemoteDataSource(memosApi, account)
-                this.repository = buildMemoRepository(remote, account)
-                this.remoteRepository = remote
-                this.httpClient = client
+            is Account.MemosV0, is Account.MemosV1 -> {
+                val remote = remoteDataSourceFactory.create(account)
+                    ?: error("RemoteDataSourceFactory returned null for ${account.accountKey()}")
+                this.repository = buildMemoRepository(remote.remoteDataSource, account)
+                this.remoteRepository = remote.remoteDataSource
+                this.httpClient = remote.httpClient
             }
         }
     }
@@ -209,17 +191,10 @@ class AccountService @Inject constructor(
             val account = accounts.first().firstOrNull { it.accountKey() == accountKey }
                 ?: return null
             return when (account) {
-                is Account.MemosV0 -> {
-                    val (_, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
+                is Account.MemosV0, is Account.MemosV1 -> {
+                    val remote = remoteDataSourceFactory.create(account) ?: return null
                     MemoRepositoryHandle(
-                        buildMemoRepository(MemosV0RemoteDataSource(memosApi, account), account),
-                        ownsLifecycle = true,
-                    )
-                }
-                is Account.MemosV1 -> {
-                    val (_, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
-                    MemoRepositoryHandle(
-                        buildMemoRepository(MemosV1RemoteDataSource(memosApi, account), account),
+                        buildMemoRepository(remote.remoteDataSource, account),
                         ownsLifecycle = true,
                     )
                 }
@@ -389,50 +364,11 @@ class AccountService @Inject constructor(
     }
 
     fun createMemosV0Client(host: String, accessToken: String?): Pair<OkHttpClient, MemosV0Api> {
-        var client = okHttpClient
-
-        if (!accessToken.isNullOrEmpty()) {
-            client = client.newBuilder().addNetworkInterceptor { chain ->
-                var request = chain.request()
-                if (shouldAttachAccessToken(request.url, host)) {
-                    request = request.newBuilder().addHeader("Authorization", "Bearer $accessToken")
-                        .build()
-                }
-                chain.proceed(request)
-            }.build()
-        }
-
-        return client to Retrofit.Builder()
-            .baseUrl(host)
-            .client(client)
-            .addConverterFactory(networkJson.asConverterFactory("application/json".toMediaType()))
-            .addCallAdapterFactory(ApiResponseCallAdapterFactory.create())
-            .build()
-            .create(MemosV0Api::class.java)
+        return memosClientFactory.createV0Client(host, accessToken)
     }
 
     fun createMemosV1Client(host: String, accessToken: String?): Pair<OkHttpClient, MemosV1Api> {
-        val client = okHttpClient.newBuilder().apply {
-            if (!accessToken.isNullOrBlank()) {
-                addNetworkInterceptor { chain ->
-                    var request = chain.request()
-                    if (shouldAttachAccessToken(request.url, host)) {
-                        request = request.newBuilder()
-                            .addHeader("Authorization", "Bearer $accessToken")
-                            .build()
-                    }
-                    chain.proceed(request)
-                }
-            }
-        }.build()
-
-        return client to Retrofit.Builder()
-            .baseUrl(host)
-            .client(client)
-            .addConverterFactory(networkJson.asConverterFactory("application/json".toMediaType()))
-            .addCallAdapterFactory(ApiResponseCallAdapterFactory.create())
-            .build()
-            .create(MemosV1Api::class.java)
+        return memosClientFactory.createV1Client(host, accessToken)
     }
 
     suspend fun checkLoginCompatibility(host: String, allowHigherV1Version: Boolean = false): LoginCompatibility {
@@ -628,13 +564,6 @@ class AccountService @Inject constructor(
             is Account.MemosV1 -> secureTokenStorage.saveToken(account.accountKey(), account.info.accessToken)
             is Account.Local -> Unit
         }
-    }
-
-    private fun shouldAttachAccessToken(requestUrl: HttpUrl, host: String): Boolean {
-        val baseUrl = host.toHttpUrlOrNull() ?: return false
-        return requestUrl.scheme == baseUrl.scheme &&
-            requestUrl.host == baseUrl.host &&
-            requestUrl.port == baseUrl.port
     }
 
     private suspend fun awaitInitialization() {
