@@ -1,8 +1,11 @@
 package io.github.eonewg.gnome.data.local
 
+import io.github.eonewg.gnome.core.tag.MemosTagParser
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
+import io.github.eonewg.gnome.data.local.dao.TagDao
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.data.local.entity.MemoTagEntity
 import io.github.eonewg.gnome.data.local.entity.MemoWithResources
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.local.entity.SyncEntityType
@@ -28,8 +31,21 @@ import kotlinx.coroutines.flow.Flow
 class LocalMemoDataSource(
     private val memoDao: MemoDao,
     private val syncOperationDao: SyncOperationDao,
+    private val tagDao: TagDao,
     private val transactionRunner: TransactionRunner,
 ) {
+
+    /**
+     * Replaces the memo's tag index rows with a fresh parse of its content.
+     * Must run inside the same transaction as the memo row write it follows.
+     */
+    private suspend fun rebuildTags(memo: MemoEntity) {
+        tagDao.deleteByMemo(memo.accountKey, memo.identifier)
+        val tags = MemosTagParser.extractTags(memo.content)
+        if (tags.isNotEmpty()) {
+            tagDao.insertAll(tags.map { MemoTagEntity(memo.accountKey, memo.identifier, it) })
+        }
+    }
 
     // -----------------------------------------------------------------------
     // Reads
@@ -69,7 +85,10 @@ class LocalMemoDataSource(
     // Single-row primitives (SyncEngine write-back paths; no implicit outbox)
     // -----------------------------------------------------------------------
 
-    suspend fun upsertMemo(memo: MemoEntity) = memoDao.insertMemo(memo)
+    suspend fun upsertMemo(memo: MemoEntity) = transactionRunner.inTransaction {
+        memoDao.insertMemo(memo)
+        rebuildTags(memo)
+    }
 
     suspend fun upsertResource(resource: ResourceEntity) = memoDao.insertResource(resource)
 
@@ -91,6 +110,7 @@ class LocalMemoDataSource(
         val staleFiles = arrayListOf<String>()
         transactionRunner.inTransaction {
             memoDao.insertMemo(memo)
+            rebuildTags(memo)
 
             val currentResources = memoDao.getMemoResources(memo.identifier, memo.accountKey)
             val remoteResourceIds = remoteResources.mapTo(hashSetOf()) { it.remoteId }
@@ -129,6 +149,7 @@ class LocalMemoDataSource(
     ) {
         transactionRunner.inTransaction {
             memoDao.insertMemo(memo)
+            rebuildTags(memo)
             memoDao.getMemoResources(sourceMemoId, accountKey).forEach { resource ->
                 memoDao.insertResource(
                     resource.copy(identifier = UUID.randomUUID().toString(), memoId = memo.identifier)
@@ -147,6 +168,7 @@ class LocalMemoDataSource(
         val resources = memoDao.getMemoResources(identifier, accountKey)
         transactionRunner.inTransaction {
             resources.forEach { memoDao.deleteResource(it) }
+            tagDao.deleteByMemo(accountKey, identifier)
             memoDao.deleteMemo(memo)
         }
         return resources
@@ -163,6 +185,7 @@ class LocalMemoDataSource(
     suspend fun createLocalMemo(memo: MemoEntity, resources: List<ResourceEntity>, sync: Boolean = true) {
         transactionRunner.inTransaction {
             memoDao.insertMemo(memo)
+            rebuildTags(memo)
             resources.forEach { resource ->
                 memoDao.insertResource(resource.copy(accountKey = memo.accountKey, memoId = memo.identifier))
             }
@@ -184,6 +207,7 @@ class LocalMemoDataSource(
         val staleFiles = arrayListOf<String>()
         transactionRunner.inTransaction {
             memoDao.insertMemo(memo)
+            rebuildTags(memo)
 
             if (resources != null) {
                 val existingResources = memoDao.getMemoResources(memo.identifier, memo.accountKey)
@@ -211,6 +235,7 @@ class LocalMemoDataSource(
     suspend fun markMemoDeleted(memo: MemoEntity) {
         transactionRunner.inTransaction {
             memoDao.insertMemo(memo.copy(isDeleted = true, needsSync = true, lastModified = Instant.now()))
+            tagDao.deleteByMemo(memo.accountKey, memo.identifier)
             enqueueOperation(memo.accountKey, SyncEntityType.MEMO, SyncOperationType.DELETE, memo.identifier)
         }
     }

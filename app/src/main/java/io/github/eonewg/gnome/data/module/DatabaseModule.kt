@@ -9,6 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import io.github.eonewg.gnome.data.local.GnomeDatabase
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
+import io.github.eonewg.gnome.data.local.dao.TagDao
 import javax.inject.Singleton
 
 @Module
@@ -28,4 +29,8 @@ object DatabaseModule {
     @Singleton
     @Provides
     fun provideSyncOperationDao(database: GnomeDatabase) = database.syncOperationDao()
+
+    @Singleton
+    @Provides
+    fun provideTagDao(database: GnomeDatabase) = database.tagDao()
 }

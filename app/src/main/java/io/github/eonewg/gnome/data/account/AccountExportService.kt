@@ -33,6 +33,7 @@ class AccountExportService @Inject constructor(
     private val localData = LocalMemoDataSource(
         database.memoDao(),
         database.syncOperationDao(),
+        database.tagDao(),
         RoomTransactionRunner(database),
     )
 

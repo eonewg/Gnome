@@ -6,7 +6,9 @@ import io.github.eonewg.gnome.data.local.LocalMemoDataSource
 import io.github.eonewg.gnome.data.local.TransactionRunner
 import io.github.eonewg.gnome.data.local.dao.MemoDao
 import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
+import io.github.eonewg.gnome.data.local.dao.TagDao
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.data.local.entity.MemoTagEntity
 import io.github.eonewg.gnome.data.local.entity.MemoWithResources
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.local.entity.SyncEntityType
@@ -53,7 +55,7 @@ class SyncEngineTest {
     private var syncedUser: User? = null
 
     private val engine = SyncEngine(
-        localData = LocalMemoDataSource(memoDao, operationDao, passthroughRunner()),
+        localData = LocalMemoDataSource(memoDao, operationDao, FakeTagDao(), passthroughRunner()),
         fileStore = SyncFileStore { },
         remoteRepository = remote,
         account = Account.Local(),
@@ -494,6 +496,28 @@ class FakeMemoDao : MemoDao {
 
     override suspend fun deleteMemosByAccount(accountKey: String) {
         memos.entries.removeIf { it.value.accountKey == accountKey }
+    }
+}
+
+class FakeTagDao : TagDao {
+    val tags = mutableListOf<MemoTagEntity>()
+
+    override suspend fun insertAll(newTags: List<MemoTagEntity>) {
+        newTags.forEach { tag ->
+            tags.removeAll { it.accountKey == tag.accountKey && it.memoId == tag.memoId && it.tag == tag.tag }
+            tags.add(tag)
+        }
+    }
+
+    override suspend fun getTagsForMemo(accountKey: String, memoId: String): List<MemoTagEntity> =
+        tags.filter { it.accountKey == accountKey && it.memoId == memoId }
+
+    override suspend fun deleteByMemo(accountKey: String, memoId: String) {
+        tags.removeAll { it.accountKey == accountKey && it.memoId == memoId }
+    }
+
+    override suspend fun deleteByAccount(accountKey: String) {
+        tags.removeAll { it.accountKey == accountKey }
     }
 }
 

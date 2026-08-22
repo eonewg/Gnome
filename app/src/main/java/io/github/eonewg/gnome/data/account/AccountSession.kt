@@ -142,6 +142,7 @@ class AccountSession @Inject constructor(
         val memoDao = database.memoDao()
         memoDao.deleteResourcesByAccount(accountKey)
         memoDao.deleteMemosByAccount(accountKey)
+        database.tagDao().deleteByAccount(accountKey)
         database.syncOperationDao().deleteAllForAccount(accountKey)
         fileStorage.deleteAccountFiles(accountKey)
     }
@@ -172,6 +173,7 @@ class AccountSession @Inject constructor(
         LocalMemoDataSource(
             database.memoDao(),
             database.syncOperationDao(),
+            database.tagDao(),
             RoomTransactionRunner(database),
         )
 

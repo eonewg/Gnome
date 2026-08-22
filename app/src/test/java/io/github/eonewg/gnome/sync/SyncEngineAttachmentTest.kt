@@ -36,7 +36,7 @@ class SyncEngineAttachmentTest {
     private val deletedFiles = mutableListOf<String>()
 
     private val engine = SyncEngine(
-        localData = LocalMemoDataSource(memoDao, operationDao, passthroughRunner()),
+        localData = LocalMemoDataSource(memoDao, operationDao, FakeTagDao(), passthroughRunner()),
         fileStore = SyncFileStore { deletedFiles.add(it) },
         remoteRepository = remote,
         account = Account.Local(),
