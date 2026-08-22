@@ -41,6 +41,7 @@ import io.github.eonewg.gnome.data.repository.RemoteRepository
 import io.github.eonewg.gnome.data.repository.SyncingRepository
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.sync.SyncScheduler
 import net.swiftzer.semver.SemVer
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -65,6 +66,7 @@ class AccountService @Inject constructor(
     private val database: GnomeDatabase,
     private val fileStorage: FileStorage,
     private val secureTokenStorage: SecureTokenStorage,
+    private val syncScheduler: SyncScheduler,
 ) {
     sealed class LoginCompatibility {
         data class Supported(val accountCase: UserData.AccountCase) : LoginCompatibility()
@@ -160,10 +162,13 @@ class AccountService @Inject constructor(
                 val (client, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
                 val remote = MemosV0Repository(memosApi, account)
                 this.repository = SyncingRepository(
+                    database,
                     database.memoDao(),
+                    database.syncOperationDao(),
                     fileStorage,
                     remote,
-                    account
+                    account,
+                    syncScheduler
                 ) { user ->
                     updateAccountFromSyncedUser(account.accountKey(), user)
                 }
@@ -174,10 +179,13 @@ class AccountService @Inject constructor(
                 val (client, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
                 val remote = MemosV1Repository(memosApi, account)
                 this.repository = SyncingRepository(
+                    database,
                     database.memoDao(),
+                    database.syncOperationDao(),
                     fileStorage,
                     remote,
-                    account
+                    account,
+                    syncScheduler
                 ) { user ->
                     updateAccountFromSyncedUser(account.accountKey(), user)
                 }
@@ -320,6 +328,7 @@ class AccountService @Inject constructor(
         val memoDao = database.memoDao()
         memoDao.deleteResourcesByAccount(accountKey)
         memoDao.deleteMemosByAccount(accountKey)
+        database.syncOperationDao().deleteAllForAccount(accountKey)
         fileStorage.deleteAccountFiles(accountKey)
     }
 

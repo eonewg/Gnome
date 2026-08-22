@@ -50,21 +50,38 @@
   UI 不再感知 LocalDatabaseRepository / SyncingRepository。
 
 ### Phase 6 — Room Outbox + Migration
-- Next：`sync_operations` 表（id/accountKey/entityType/entityId/operation/createdAt/
-  attemptCount/lastAttemptAt/lastError），操作：UPSERT_MEMO / DELETE_MEMO /
-  UPLOAD_ATTACHMENT / DELETE_ATTACHMENT。
-- gnome.db v1→v2 显式 Migration + schema export + MigrationTestHelper 测试（androidTest）。
+- **Done** `sync_operations` 表（id/accountKey/entityType/entityId/operation/payload/
+  createdAt/attemptCount/lastAttemptAt/lastError），操作：MEMO+ATTACHMENT × UPSERT+DELETE；
+  唯一索引 (accountKey, entityType, entityId, operation) 以 REPLACE 合并重复入队。
+- **Done** gnome.db v1→v2 显式 Migration + schema export（`2.json`，与 Migration SQL 逐列核对一致）。
+- **Done** MigrationTestHelper 迁移测试（androidTest，本机无设备仅编译验证，待真机执行）。
 
 ### Phase 7 — SyncEngine + ConflictResolver
-- Next：从 `SyncingRepository` 提取 `sync/SyncEngine`（pullRemote / applyRemoteChanges /
-  resolveConflicts / processOutbox / reconcile）与纯函数 `ConflictResolver`
-  （保持「保留服务器版本 + 复制本地版本为新 Memo」语义）+ 单测。
+- **Done** `sync/ConflictResolver`：纯函数决策表（APPLY_REMOTE / MARK_SYNCED / PUSH_LOCAL /
+  DUPLICATE / DELETE_REMOTE）+ memoEquivalent/hasRemoteChanged/资源签名，含完整单测。
+- **Done** `sync/SyncEngine`：从 SyncingRepository 提取的唯一同步算法
+  （拉全量 snapshot → 逐行 reconcile → push pending → drain outbox）；
+  remote snapshot 合并与冲突复制改为事务写入。
+- **Done** 修复继承自原实现的缺陷：第二遍本地扫描使用过期快照，会把本次同步刚推送到
+  服务器的行（如冲突复制的新 Memo）立即本地清除、等下次同步才拉回。现以
+  knownRemoteIds（快照 + 本次新建）判定。
+- **Done** SyncEngineTest（JVM，内存 Fake DAO/远端）：离线 create/edit/delete、
+  双改冲突复制、远端删除清理、outbox 失败保留 attemptCount 并在重试后清空、
+  幂等 no-op 等场景。
 
 ### Phase 8 — WorkManager Sync
-- Next：`SyncWorker` + `SyncScheduler`；unique work `gnome-sync:<accountKey>`；
-  Constraints CONNECTED + 指数退避；错误分类决定 retry / fail。
-  手动“立即同步”走 `SyncScheduler.syncNow` → 同一 SyncEngine。
-  移除 `SyncingRepository.operationScope` fire-and-forget 推送。
+- **Done** `sync/SyncWorker` + `sync/SyncScheduler`；unique work `gnome-sync:<accountKey>`，
+  ExistingWorkPolicy.APPEND_OR_REPLACE，Constraints CONNECTED，指数退避 30s 起。
+- **Done** 错误分类：IOException/408/429/5xx → Result.retry()；401/403（GnomeException
+  含 accessTokenInvalid）/其他 4xx → Result.failure()，不无限重试。
+- **Done** 移除 `SyncingRepository.operationScope` fire-and-forget 推送：写入路径
+  （create/update/delete/archive/restore/createResource/deleteResource）全部改为
+  `database.withTransaction { 实体写入 + outbox 入队 }`，随后 `SyncScheduler.schedule`。
+  手动"立即同步"（`sync()`）与 Worker 共用同一 SyncEngine，单一算法。
+- **Done** 账号移除时 purge outbox（`SyncOperationDao.deleteAllForAccount`）。
+- Deferred：非当前账号的后台同步（Worker 目前跳过非当前账号的 work，待 Phase 10
+  AccountService 拆分出 RemoteDataSourceFactory 后支持）。附件上传/删除链路的
+  端到端测试需真机（涉及本地文件与 Uri）。
 
 ### Phase 9 — 移除 SyncingRepository
 - Deferred（Phase 5/8 稳定、UI 全部经 MemoRepository 后执行）。

@@ -9,6 +9,7 @@ import dagger.hilt.components.SingletonComponent
 import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.GnomeDatabase
 import io.github.eonewg.gnome.data.local.dao.MemoDao
+import io.github.eonewg.gnome.data.local.dao.SyncOperationDao
 import io.github.eonewg.gnome.data.repository.LocalDatabaseRepository
 import javax.inject.Singleton
 
@@ -25,6 +26,10 @@ object DatabaseModule {
     @Singleton
     @Provides
     fun provideMemoDao(database: GnomeDatabase) = database.memoDao()
+
+    @Singleton
+    @Provides
+    fun provideSyncOperationDao(database: GnomeDatabase) = database.syncOperationDao()
 
     @Singleton
     @Provides
