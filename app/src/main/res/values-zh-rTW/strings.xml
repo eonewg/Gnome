@@ -98,6 +98,7 @@
     <string name="memos_account_description">連線到 Memos 伺服器以同步資料。</string>
     <string name="sync_status_sync_now">立即同步</string>
     <string name="sync_status_unsynced">尚未同步的變更</string>
+    <string name="sync_status_synced">已同步</string>
     <string name="memo_sync_pending">MEMO 尚未同步</string>
     <string name="memo_sync_synced">MEMO 已同步</string>
     <string name="failed_to_open_attachment">無法開啟附件</string>

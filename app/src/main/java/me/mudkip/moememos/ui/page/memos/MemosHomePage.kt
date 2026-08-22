@@ -377,6 +377,7 @@ fun MemosHomePage(
                             SyncStatusBadge(
                                 syncing = syncStatus.syncing,
                                 unsyncedCount = syncStatus.unsyncedCount,
+                                errorMessage = syncStatus.errorMessage,
                                 onSync = {
                                     scope.launch {
                                         requestManualSync()

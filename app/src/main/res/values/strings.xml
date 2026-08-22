@@ -98,6 +98,7 @@
     <string name="memos_account_description">Connect to a Memos server to sync data.</string>
     <string name="sync_status_sync_now">Sync now</string>
     <string name="sync_status_unsynced">Unsynced changes</string>
+    <string name="sync_status_synced">Synced</string>
     <string name="memo_sync_pending">Memo not synced</string>
     <string name="memo_sync_synced">Memo synced</string>
     <string name="preferences">Preferences</string>
