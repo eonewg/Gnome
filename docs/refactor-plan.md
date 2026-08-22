@@ -191,7 +191,7 @@
   - 验证：129 单测全绿，assembleDebug + assembleRelease 通过。
 
 ### Phase 16.5 — Legacy Boundary Cleanup
-- **Done**（commit c450eb48）：
+- **Done**（commit a1d0dff4）：
   - 领域流补全：`MemoRepository` 新增 `observeArchived()` / `observeAttachments()`
     （Room flow 投影 domain），Archived/Resource 列表改流驱动，删快照管理。
   - MemoDetail 全链路 domain 化：UiState/ViewModel 不再接触 MemoEntity，
