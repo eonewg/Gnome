@@ -18,18 +18,19 @@ import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
+import io.github.eonewg.gnome.data.model.TagUsage
 import io.github.eonewg.gnome.data.model.User
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.sync.SyncEngine
 import io.github.eonewg.gnome.sync.SyncFileStore
 import io.github.eonewg.gnome.sync.SyncScheduler
 import io.github.eonewg.gnome.ext.getErrorMessage
-import io.github.eonewg.gnome.core.tag.MemosTagParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -216,10 +217,8 @@ class MemoRepositoryImpl(
 
     override suspend fun listTags(): ApiResponse<List<String>> {
         return try {
-            val localTags = localData.getTimeline(accountKeyValue)
-                .asSequence()
-                .flatMap { MemosTagParser.extractTags(it.content).asSequence() }
-                .filter { it.isNotBlank() }
+            val localTags = localData.observeTags(accountKeyValue).first()
+                .map { it.tag }
                 .toSet()
             // Remote accounts refresh the tag list from the Memos instance
             // once per editor entry; network failures fall back to the
@@ -238,6 +237,20 @@ class MemoRepositoryImpl(
             ApiResponse.Failure.Exception(e)
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Local tag index (Room)
+    // -----------------------------------------------------------------------
+
+    override fun observeTagsFlow(): Flow<List<TagUsage>> =
+        localData.observeTags(accountKeyValue)
+
+    override fun observeMemosByTag(tag: String): Flow<List<Memo>> =
+        localData.observeMemosByTag(accountKeyValue, tag)
+            .map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun getTagSuggestions(query: String): List<TagUsage> =
+        localData.getTagSuggestions(accountKeyValue, query)
 
     override suspend fun listResources(): ApiResponse<List<ResourceEntity>> {
         return try {

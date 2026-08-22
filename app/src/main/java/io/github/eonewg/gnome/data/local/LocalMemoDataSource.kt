@@ -11,6 +11,7 @@ import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.local.entity.SyncEntityType
 import io.github.eonewg.gnome.data.local.entity.SyncOperationEntity
 import io.github.eonewg.gnome.data.local.entity.SyncOperationType
+import io.github.eonewg.gnome.data.model.TagUsage
 import java.io.File
 import java.net.URI
 import java.time.Instant
@@ -80,6 +81,38 @@ class LocalMemoDataSource(
 
     suspend fun getResource(identifier: String, accountKey: String): ResourceEntity? =
         memoDao.getResourceById(identifier, accountKey)
+
+    // -----------------------------------------------------------------------
+    // Tag index reads
+    // -----------------------------------------------------------------------
+
+    /** Tag vocabulary with usage counts (frequency DESC, tag ASC). */
+    fun observeTags(accountKey: String): Flow<List<TagUsage>> =
+        tagDao.observeTags(accountKey)
+
+    /** Live timeline memos carrying the exact tag (indexed ancestors match too). */
+    fun observeMemosByTag(accountKey: String, tag: String): Flow<List<MemoEntity>> =
+        tagDao.observeMemosByTag(accountKey, tag)
+
+    /**
+     * Prefix-matched tag suggestions (frequency DESC, tag ASC). The prefix is
+     * LIKE-escaped so `%`/`_` in the query stay literal.
+     */
+    suspend fun getTagSuggestions(accountKey: String, query: String): List<TagUsage> =
+        tagDao.getTagSuggestions(accountKey, escapeLikePrefix(query))
+
+    private fun escapeLikePrefix(query: String): String {
+        val escaped = buildString(query.length + 1) {
+            query.forEach { char ->
+                when (char) {
+                    '\\', '%', '_' -> append('\\')
+                }
+                append(char)
+            }
+            append('%')
+        }
+        return escaped
+    }
 
     // -----------------------------------------------------------------------
     // Single-row primitives (SyncEngine write-back paths; no implicit outbox)

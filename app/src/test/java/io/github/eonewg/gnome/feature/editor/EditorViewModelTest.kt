@@ -5,7 +5,10 @@ import androidx.lifecycle.SavedStateHandle
 import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.MemoVisibility
+import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.ShareContent
+import io.github.eonewg.gnome.data.model.TagUsage
+import com.skydoves.sandwich.ApiResponse
 import io.github.eonewg.gnome.feature.FakeAccountService
 import io.github.eonewg.gnome.feature.FakeMemoRepository
 import io.github.eonewg.gnome.feature.FakeMemoService
@@ -248,5 +251,23 @@ class EditorViewModelTest {
         assertTrue(base.copy(text = TextFieldValue("x")).canSubmit)
         assertTrue(base.copy(attachments = listOf(Attachment(id = "a", filename = "f", uri = "u"))).canSubmit)
         assertFalse(base.canSubmit)
+    }
+
+    @Test
+    fun `tag suggestions come from the Room index not the timeline scan`() = runTest(testDispatcher) {
+        accountService.accountState.value = Account.Local()
+        repository.tagUsageState.value = listOf(
+            TagUsage("work", 3),
+            TagUsage("life", 1),
+            TagUsage("work/notes", 1),
+        )
+        repository.tagsResult = ApiResponse.Success(listOf("remote-only"))
+
+        val viewModel = newViewModel()
+        val state = viewModel.uiState.first { "remote-only" in it.tags }
+
+        // The vocabulary is the union of the Room index and the server list,
+        // deduplicated and sorted like before — no memo content is scanned.
+        assertEquals(listOf("life", "remote-only", "work", "work/notes"), state.tags)
     }
 }

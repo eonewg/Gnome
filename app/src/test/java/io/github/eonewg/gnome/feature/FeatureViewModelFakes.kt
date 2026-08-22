@@ -19,6 +19,7 @@ import io.github.eonewg.gnome.data.local.FileStorage
 import io.github.eonewg.gnome.data.local.GnomeDatabase
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.SyncStatus
+import io.github.eonewg.gnome.data.model.TagUsage
 import io.github.eonewg.gnome.data.repository.MemoRepository
 import io.github.eonewg.gnome.data.service.AccountService
 import io.github.eonewg.gnome.data.service.MemoService
@@ -154,6 +155,19 @@ internal class FakeMemoRepository : MemoRepository {
         ApiResponse.Success(memosById.values.filter { it.archived })
 
     override suspend fun listTags(): ApiResponse<List<String>> = tagsResult
+
+    /** Programmable Room-index source; the editor subscriptions consume this. */
+    val tagUsageState = MutableStateFlow<List<TagUsage>>(emptyList())
+
+    val memosByTagState = MutableStateFlow<List<Memo>>(emptyList())
+
+    var suggestionsResult: List<TagUsage> = emptyList()
+
+    override fun observeTagsFlow(): Flow<List<TagUsage>> = tagUsageState
+
+    override fun observeMemosByTag(tag: String): Flow<List<Memo>> = memosByTagState
+
+    override suspend fun getTagSuggestions(query: String): List<TagUsage> = suggestionsResult
 
     override suspend fun createMemo(
         content: String,

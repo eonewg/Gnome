@@ -8,6 +8,7 @@ import io.github.eonewg.gnome.core.model.Attachment
 import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
+import io.github.eonewg.gnome.data.model.TagUsage
 
 /**
  * The feature-facing contract for memo data. New ViewModels and screens
@@ -39,6 +40,15 @@ interface MemoRepository {
     suspend fun listArchived(): ApiResponse<List<Memo>>
 
     suspend fun listTags(): ApiResponse<List<String>>
+
+    /** Locally indexed tag vocabulary with usage counts (frequency DESC, tag ASC). */
+    fun observeTagsFlow(): Flow<List<TagUsage>>
+
+    /** Live timeline memos carrying the exact tag (indexed ancestors match too). */
+    fun observeMemosByTag(tag: String): Flow<List<Memo>>
+
+    /** Prefix-matched tag suggestions from the local index (frequency DESC, tag ASC). */
+    suspend fun getTagSuggestions(query: String): List<TagUsage>
 
     suspend fun createMemo(
         content: String,

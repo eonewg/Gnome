@@ -5,22 +5,24 @@ import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
-import org.robolectric.RuntimeEnvironment
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.data.model.TagUsage
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
  * Locally-runnable coverage for the memo_tags index: the 2→3 migration
  * backfill (the schema-validated equivalent lives in the androidTest
- * MigrationTest) and the transactional tag-row lifecycle in
- * [LocalMemoDataSource].
+ * MigrationTest), the transactional tag-row lifecycle in
+ * [LocalMemoDataSource], and the tag query semantics.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -93,9 +95,8 @@ class MemoTagIndexTest {
             .allowMainThreadQueries()
             .build()
         try {
-            val memoDao = database.memoDao()
             val localData = LocalMemoDataSource(
-                memoDao,
+                database.memoDao(),
                 database.syncOperationDao(),
                 database.tagDao(),
                 RoomTransactionRunner(database),
@@ -131,6 +132,62 @@ class MemoTagIndexTest {
 
             localData.purgeMemo("m1", "local")
             assertEquals(emptyList<String>(), indexedTags())
+        } finally {
+            database.close()
+        }
+    }
+
+    @Test
+    fun tagQueries_orderByFrequencyThenName_andFilterLiveTimeline() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val database = Room.inMemoryDatabaseBuilder(context, GnomeDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        try {
+            val localData = LocalMemoDataSource(
+                database.memoDao(),
+                database.syncOperationDao(),
+                database.tagDao(),
+                RoomTransactionRunner(database),
+            )
+
+            fun memo(id: String, content: String, archived: Boolean = false): MemoEntity =
+                MemoEntity(
+                    identifier = id,
+                    accountKey = "local",
+                    content = content,
+                    date = Instant.ofEpochMilli(1_000L + id.hashCode()),
+                    visibility = MemoVisibility.PRIVATE,
+                    pinned = false,
+                    archived = archived,
+                )
+
+            // work appears twice, life once; b/child implies ancestor b.
+            localData.createLocalMemo(memo("m1", "#work #life"), emptyList(), sync = false)
+            localData.createLocalMemo(memo("m2", "#work #b/child"), emptyList(), sync = false)
+            // Archived and soft-deleted memos must not inflate counts or results.
+            localData.createLocalMemo(memo("m3", "#life", archived = true), emptyList(), sync = false)
+            localData.markMemoDeleted(memo("m4", "#work"))
+
+            // frequency DESC first, then tag ASC: work(2) outranks the 1-count tags.
+            val tags = database.tagDao().observeTags("local").first()
+            assertEquals(
+                listOf(TagUsage("work", 2), TagUsage("b", 1), TagUsage("b/child", 1), TagUsage("life", 1)),
+                tags,
+            )
+
+            // Prefix suggestions are literal (`%`/`_` escaped) and frequency-ordered.
+            assertEquals(
+                listOf(TagUsage("b", 1), TagUsage("b/child", 1)),
+                localData.getTagSuggestions("local", "b"),
+            )
+            assertEquals(emptyList<TagUsage>(), localData.getTagSuggestions("local", "100%"))
+
+            // Whole-word lookup matches indexed ancestors; live timeline only.
+            val byChild = database.tagDao().observeMemosByTag("local", "b/child").first()
+            assertEquals(listOf("m2"), byChild.map { it.identifier })
+            val byLife = database.tagDao().observeMemosByTag("local", "life").first()
+            assertEquals(listOf("m1"), byLife.map { it.identifier })
         } finally {
             database.close()
         }

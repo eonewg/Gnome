@@ -21,9 +21,9 @@ import io.github.eonewg.gnome.data.service.MemoService
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.suspendOnErrorMessage
 import io.github.eonewg.gnome.ui.page.memoinput.restorableMemoInputDraft
-import io.github.eonewg.gnome.core.tag.MemosTagParser
 import io.github.eonewg.gnome.widget.WidgetUpdater
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -66,23 +66,30 @@ class EditorViewModel @Inject constructor(
     /** Tags discovered on the server; merged into the suggestions once. */
     private var remoteTags: Set<String> = emptySet()
 
+    /** Cancelled and restarted on every account switch. */
+    private var localTagsJob: Job? = null
+
     private var shareMode = false
 
     init {
         viewModelScope.launch {
             accountService.currentAccount.collect { account ->
                 _uiState.update { it.copy(isLocalAccount = account is Account.Local) }
-            }
-        }
-        viewModelScope.launch {
-            // Local tags stay fresh as the timeline changes; remote accounts also
-            // pull the server's tag list once per editor session.
-            memoService.domainMemos.collect { memos ->
-                val localTags = memos.asSequence()
-                    .flatMap { MemosTagParser.extractTags(it.content).asSequence() }
-                    .filter { it.isNotBlank() }
-                    .toSet()
-                _uiState.update { it.copy(tags = (localTags + remoteTags).sorted()) }
+                localTagsJob?.cancel()
+                if (account == null) {
+                    _uiState.update { state -> state.copy(tags = remoteTags.sorted()) }
+                    return@collect
+                }
+                // The tag vocabulary comes from the Room tag index — an
+                // aggregate query, not a per-keystroke scan of every memo.
+                localTagsJob = viewModelScope.launch {
+                    memoService.getMemoRepository().observeTagsFlow().collect { usages ->
+                        _uiState.update { state ->
+                            val localTags = usages.mapTo(linkedSetOf()) { it.tag }
+                            state.copy(tags = (localTags + remoteTags).sorted())
+                        }
+                    }
+                }
             }
         }
         viewModelScope.launch {

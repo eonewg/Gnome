@@ -512,6 +512,17 @@ class FakeTagDao : TagDao {
     override suspend fun getTagsForMemo(accountKey: String, memoId: String): List<MemoTagEntity> =
         tags.filter { it.accountKey == accountKey && it.memoId == memoId }
 
+    override fun observeTags(accountKey: String): Flow<List<io.github.eonewg.gnome.data.model.TagUsage>> =
+        flowOf(emptyList())
+
+    override suspend fun getTagSuggestions(
+        accountKey: String,
+        prefix: String,
+    ): List<io.github.eonewg.gnome.data.model.TagUsage> = emptyList()
+
+    override fun observeMemosByTag(accountKey: String, tag: String): Flow<List<MemoEntity>> =
+        flowOf(emptyList())
+
     override suspend fun deleteByMemo(accountKey: String, memoId: String) {
         tags.removeAll { it.accountKey == accountKey && it.memoId == memoId }
     }
