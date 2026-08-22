@@ -398,6 +398,10 @@ API: 36
 
 Unit tests: 164 PASS
 Instrumentation tests: 5 (3 PASS, 2 SKIP)
+  - Migration/示例测试: PASS
+  - QuickMemoActivity account-required instrumentation: SKIPPED —
+    当前真机测试部署后应用账号状态不可用（见 Known issues），无账号环境自动跳过
+  - No-account fallback: PASS — 宿主按设计回退 MainActivity 引导页（手动验证）
 
 Smoke:
 Timeline: PASS — 本地账户创建后写 1 条 memo，立即出现（22:02）
@@ -408,8 +412,8 @@ Edit: NOT TESTED
 Delete: NOT TESTED
 Attachment: NOT TESTED
 Conflict: NOT TESTED — 无 Memos server 凭据/第二客户端
-Quick Settings Tile: NOT TESTED — 未添加到系统 QS（不擅自改用户布局）；
-  无账号回退路径已由 instrumentation skip 场景 + 手动引导页验证
+Quick Settings Tile cold-start: NOT TESTED / MANUAL TEST REQUIRED —
+  Tile 未添加到系统 QS（不擅自改用户布局）
 Share text: PASS — 预填 singleTask onNewIntent 正确；取消不创建 memo；
   Discard 对话框丢弃草稿
 Share image: NOT TESTED — 未向用户设备注入媒体文件
@@ -423,10 +427,10 @@ Warm launch: 63ms
 Tile → Editor: NOT TESTED
 
 Known issues: 
-- ColorOS（PJD110）安装守护弹窗拦截 adb/gradle 静默安装 test APK，
-  connectedDebugAndroidTest 期间会弹"来自电脑端未知来源"确认框（设备环境，非 app bug）
-- AGP connected 测试会卸载并重装 target APK（清空数据）——每次测试后应用从桌面
-  暂时消失，需重新登录；测试过程中避免与用户使用冲突
+- 在当前 OnePlus / ColorOS 真机和本次 `connectedDebugAndroidTest` 执行链中，观察到
+  target APK 被重新部署后 Gnome 当前账号/应用状态丢失，同时 ColorOS 的
+  "来自电脑端未知来源"安装守护会拦截测试 APK 安装。该现象记录为本设备和当前
+  测试工具链下的实际行为，不泛化为所有 AGP instrumentation 测试。
 - 设备 shell 不允许 kill PID，进程死亡自动化受限（用 am crash 代替）
 Deferred:
 - Tile/Widget/Share image 手动验收（需用户操作 QS/桌面/相册）
@@ -434,7 +438,7 @@ Deferred:
   Memos server 凭据
 - 重启设备 Case 4；Baseline Profile 的 Macrobenchmark 量化（现状有 prof 无 benchmark 模块）
 - 新增 androidTest QuickMemoActivityTest（冷启动 + recreate）：无账号环境自动 SKIP
-  （宿主按设计回退 MainActivity），有账号设备上会真正断言 editor 出现
+  （宿主按设计回退 MainActivity）；在有可用账号状态的设备上会真正断言 editor 出现
 
 ### Phase 20 — 删除 Moe Memos 遗留命名与死代码
 - In progress（Phase 1 已完成代码级命名；fastlane 元数据等外围遗留随发版流程清理）。
