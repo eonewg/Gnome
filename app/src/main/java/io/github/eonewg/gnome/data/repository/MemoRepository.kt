@@ -9,6 +9,7 @@ import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.core.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.model.TagUsage
+import java.time.Instant
 
 /**
  * The feature-facing contract for memo data. New ViewModels and screens
@@ -49,6 +50,19 @@ interface MemoRepository {
 
     /** Prefix-matched tag suggestions from the local index (frequency DESC, tag ASC). */
     suspend fun getTagSuggestions(query: String): List<TagUsage>
+
+    /**
+     * Database content search (LIKE substring, CJK-friendly) over live memos,
+     * optionally including archived ones, narrowed by an exact tag and/or a
+     * half-open date range.
+     */
+    fun observeSearch(
+        query: String,
+        includeArchived: Boolean = false,
+        tag: String? = null,
+        dateFrom: Instant? = null,
+        dateTo: Instant? = null,
+    ): Flow<List<Memo>>
 
     suspend fun createMemo(
         content: String,

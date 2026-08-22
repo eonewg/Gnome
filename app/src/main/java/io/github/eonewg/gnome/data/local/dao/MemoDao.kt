@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.local.entity.MemoWithResources
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
+import java.time.Instant
 
 @Dao
 interface MemoDao {
@@ -40,6 +41,35 @@ interface MemoDao {
 
     @Query("SELECT COUNT(*) FROM memos WHERE accountKey = :accountKey AND needsSync = 1")
     fun observeUnsyncedCount(accountKey: String): Flow<Int>
+
+    /**
+     * Content search over the local database: case-insensitive LIKE substring
+     * (works for CJK without an FTS index), filtering by archived state, an
+     * exact tag (indexed ancestors match too) and an optional date range.
+     * The caller must LIKE-escape `%`/`_`/`\` in [escapedQuery].
+     */
+    @Transaction
+    @Query("""
+        SELECT * FROM memos
+        WHERE accountKey = :accountKey AND isDeleted = 0
+            AND (:includeArchived = 1 OR archived = 0)
+            AND content LIKE '%' || :escapedQuery || '%' ESCAPE '\'
+            AND (:tag IS NULL OR identifier IN (
+                SELECT memoId FROM memo_tags
+                WHERE accountKey = :accountKey AND tag = :tag
+            ))
+            AND (:dateFrom IS NULL OR date >= :dateFrom)
+            AND (:dateTo IS NULL OR date < :dateTo)
+        ORDER BY pinned DESC, date DESC
+    """)
+    fun observeSearchMemos(
+        accountKey: String,
+        escapedQuery: String,
+        includeArchived: Boolean,
+        tag: String?,
+        dateFrom: Instant?,
+        dateTo: Instant?,
+    ): Flow<List<MemoWithResources>>
 
     @Query("SELECT * FROM memos WHERE identifier = :identifier AND accountKey = :accountKey")
     suspend fun getMemoById(identifier: String, accountKey: String): MemoEntity?

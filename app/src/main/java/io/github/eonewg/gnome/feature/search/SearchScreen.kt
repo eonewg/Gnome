@@ -1,7 +1,10 @@
-package io.github.eonewg.gnome.ui.page.memos
+package io.github.eonewg.gnome.feature.search
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,34 +27,38 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavHostController
-import kotlinx.coroutines.delay
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.viewmodel.LocalMemos
 import io.github.eonewg.gnome.ui.page.common.RouteName
+import io.github.eonewg.gnome.ui.page.memos.MemosList
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.net.URLEncoder
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchPage(navController: NavHostController) {
-    var searchText by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue())
-    }
-
+fun SearchScreen(
+    uiState: SearchUiState,
+    onQueryChange: (String) -> Unit,
+    onIncludeArchivedChange: (Boolean) -> Unit,
+    navController: NavHostController,
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusRequester = remember { FocusRequester() }
     val colors = GnomeDesign.colors
+    var searchText by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue())
+    }
 
     Scaffold(
         containerColor = colors.appBackground,
@@ -84,7 +91,10 @@ fun SearchPage(navController: NavHostController) {
                                     .weight(1f)
                                     .focusRequester(focusRequester),
                                 value = searchText,
-                                onValueChange = { searchText = it },
+                                onValueChange = {
+                                    searchText = it
+                                    onQueryChange(it.text)
+                                },
                                 singleLine = true,
                                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.textPrimary),
                                 cursorBrush = SolidColor(colors.accent),
@@ -106,9 +116,7 @@ fun SearchPage(navController: NavHostController) {
                 },
                 actions = {
                     TextButton(
-                        onClick = {
-                            navController.popBackStackIfLifecycleIsResumed(lifecycleOwner)
-                        }
+                        onClick = { navController.popBackStackIfLifecycleIsResumed(lifecycleOwner) }
                     ) {
                         Text(
                             text = R.string.cancel.string,
@@ -121,17 +129,63 @@ fun SearchPage(navController: NavHostController) {
         },
 
         content = { innerPadding ->
-            MemosList(
-                memos = LocalMemos.current.domainMemos,
-                contentPadding = innerPadding,
-                searchString = searchText.text,
-                onTagClick = { tag ->
-                    navController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
-                        launchSingleTop = true
-                        restoreState = true
+            Column(modifier = Modifier.fillMaxSize()) {
+                TextButton(
+                    onClick = { onIncludeArchivedChange(!uiState.includeArchived) },
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text(
+                        text = if (uiState.includeArchived) {
+                            R.string.search_include_archived_on.string
+                        } else {
+                            R.string.search_include_archived_off.string
+                        },
+                        color = if (uiState.includeArchived) colors.accent else colors.textSecondary,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                when {
+                    !uiState.hasSearched -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = R.string.search_hint.string,
+                                color = colors.textSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+
+                    uiState.results.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = R.string.no_results.string,
+                                color = colors.textSecondary,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        }
+                    }
+
+                    else -> {
+                        MemosList(
+                            memos = uiState.results,
+                            contentPadding = innerPadding,
+                            loadOnStart = false,
+                            onTagClick = { tag ->
+                                navController.navigate("${RouteName.TAG}/${URLEncoder.encode(tag, "UTF-8")}") {
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            }
+                        )
                     }
                 }
-            )
+            }
         }
     )
 

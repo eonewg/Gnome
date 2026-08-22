@@ -163,4 +163,7 @@
     <string name="memo_character_count">Characters: %1$d</string>
     <string name="memo_created_time">Created: %1$s</string>
     <string name="memo_last_edited">Last edited: %1$s</string>
+    <string name="no_results">No results</string>
+    <string name="search_include_archived_off">Search archived</string>
+    <string name="search_include_archived_on">Including archived</string>
 </resources>

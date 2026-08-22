@@ -150,4 +150,7 @@
     <string name="memo_character_count">字符统计：%1$d</string>
     <string name="memo_created_time">创建时间：%1$s</string>
     <string name="memo_last_edited">最后编辑：%1$s</string>
+    <string name="no_results">没有找到结果</string>
+    <string name="search_include_archived_off">搜索归档</string>
+    <string name="search_include_archived_on">包含归档</string>
 </resources>

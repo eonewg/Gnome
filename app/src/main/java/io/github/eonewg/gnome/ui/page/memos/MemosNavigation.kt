@@ -10,6 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.feature.search.SearchRoute
 import io.github.eonewg.gnome.feature.timeline.TimelineRoute
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.viewmodel.LocalUserState
@@ -93,7 +94,7 @@ fun MemosNavigation(
         }
 
         composable(RouteName.SEARCH) {
-            SearchPage(navController = navController)
+            SearchRoute(navController = navController)
         }
     }
 

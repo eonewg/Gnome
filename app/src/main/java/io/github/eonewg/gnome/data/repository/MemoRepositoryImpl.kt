@@ -252,6 +252,16 @@ class MemoRepositoryImpl(
     override suspend fun getTagSuggestions(query: String): List<TagUsage> =
         localData.getTagSuggestions(accountKeyValue, query)
 
+    override fun observeSearch(
+        query: String,
+        includeArchived: Boolean,
+        tag: String?,
+        dateFrom: Instant?,
+        dateTo: Instant?,
+    ): Flow<List<Memo>> =
+        localData.searchMemos(accountKeyValue, query, includeArchived, tag, dateFrom, dateTo)
+            .map { rows -> rows.map { it.toDomain() } }
+
     override suspend fun listResources(): ApiResponse<List<ResourceEntity>> {
         return try {
             ApiResponse.Success(localData.getAllResources(accountKeyValue))

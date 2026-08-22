@@ -101,17 +101,38 @@ class LocalMemoDataSource(
     suspend fun getTagSuggestions(accountKey: String, query: String): List<TagUsage> =
         tagDao.getTagSuggestions(accountKey, escapeLikePrefix(query))
 
-    private fun escapeLikePrefix(query: String): String {
-        val escaped = buildString(query.length + 1) {
-            query.forEach { char ->
-                when (char) {
-                    '\\', '%', '_' -> append('\\')
-                }
-                append(char)
+    // -----------------------------------------------------------------------
+    // Search
+    // -----------------------------------------------------------------------
+
+    /**
+     * Content substring search over the local database (LIKE, CJK-friendly),
+     * restricted to live memos, with optional archived inclusion, an exact
+     * tag and a date range.
+     */
+    fun searchMemos(
+        accountKey: String,
+        query: String,
+        includeArchived: Boolean = false,
+        tag: String? = null,
+        dateFrom: Instant? = null,
+        dateTo: Instant? = null,
+    ): Flow<List<MemoWithResources>> =
+        memoDao.observeSearchMemos(accountKey, escapeLikeQuery(query), includeArchived, tag, dateFrom, dateTo)
+
+    private fun escapeLikePrefix(query: String): String =
+        escapeLikeQuery(query) + "%"
+
+    /** Escapes `%`, `_` and `\` so user input stays literal inside LIKE. */
+    private fun escapeLikeQuery(query: String): String {
+        val escaped = StringBuilder(query.length)
+        query.forEach { char ->
+            when (char) {
+                '\\', '%', '_' -> escaped.append('\\')
             }
-            append('%')
+            escaped.append(char)
         }
-        return escaped
+        return escaped.toString()
     }
 
     // -----------------------------------------------------------------------

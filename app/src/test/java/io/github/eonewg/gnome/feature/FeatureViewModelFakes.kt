@@ -169,6 +169,17 @@ internal class FakeMemoRepository : MemoRepository {
 
     override suspend fun getTagSuggestions(query: String): List<TagUsage> = suggestionsResult
 
+    /** Content-substring search over the in-memory memo map (LIKE semantics). */
+    val searchState = MutableStateFlow<List<Memo>>(emptyList())
+
+    override fun observeSearch(
+        query: String,
+        includeArchived: Boolean,
+        tag: String?,
+        dateFrom: java.time.Instant?,
+        dateTo: java.time.Instant?,
+    ): Flow<List<Memo>> = searchState
+
     override suspend fun createMemo(
         content: String,
         visibility: MemoVisibility,

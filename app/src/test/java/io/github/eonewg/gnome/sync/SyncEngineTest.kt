@@ -456,6 +456,15 @@ class FakeMemoDao : MemoDao {
     override fun observeUnsyncedCount(accountKey: String): Flow<Int> =
         flowOf(memos.values.count { it.accountKey == accountKey && it.needsSync })
 
+    override fun observeSearchMemos(
+        accountKey: String,
+        escapedQuery: String,
+        includeArchived: Boolean,
+        tag: String?,
+        dateFrom: Instant?,
+        dateTo: Instant?,
+    ): Flow<List<MemoWithResources>> = flowOf(emptyList())
+
     override suspend fun getMemoById(identifier: String, accountKey: String): MemoEntity? =
         memos[identifier]?.takeIf { it.accountKey == accountKey }
 

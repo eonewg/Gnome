@@ -10,14 +10,19 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
-import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.viewmodel.LocalMemos
+import io.github.eonewg.gnome.feature.tag.TagMemoViewModel
 import io.github.eonewg.gnome.ui.page.common.RouteName
+import java.net.URLEncoder
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,6 +33,12 @@ fun TagMemoPage(
 ) {
     val scope = rememberCoroutineScope()
     val normalizedCurrentTag = remember(tag) { normalizeTag(tag) }
+    val tagViewModel: TagMemoViewModel = hiltViewModel()
+    val uiState by tagViewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(tag) {
+        tagViewModel.setTag(tag)
+    }
 
     Scaffold(
         topBar = {
@@ -40,26 +51,19 @@ fun TagMemoPage(
                         }
                     }
                 },
-//                actions = {
-//                    IconButton(onClick = {
-//
-//                    }) {
-//                        Icon(Icons.Filled.Search, contentDescription = "Search")
-//                    }
-//                }
             )
         },
 
         content = { innerPadding ->
             MemosList(
-                memos = LocalMemos.current.domainMemos,
+                memos = uiState.memos,
                 contentPadding = innerPadding,
-                tag = tag,
+                loadOnStart = false,
                 onTagClick = { clickedTag ->
                     if (normalizeTag(clickedTag) == normalizedCurrentTag) {
                         return@MemosList
                     }
-                    navController.navigate("${RouteName.TAG}/${java.net.URLEncoder.encode(clickedTag, "UTF-8")}") {
+                    navController.navigate("${RouteName.TAG}/${URLEncoder.encode(clickedTag, "UTF-8")}") {
                         launchSingleTop = true
                         restoreState = true
                     }

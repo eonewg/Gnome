@@ -33,7 +33,7 @@ import io.github.eonewg.gnome.ui.page.account.AddAccountPage
 import io.github.eonewg.gnome.ui.page.login.LoginPage
 import io.github.eonewg.gnome.ui.page.memos.MemoDetailPage
 import io.github.eonewg.gnome.ui.page.memos.MemosPage
-import io.github.eonewg.gnome.ui.page.memos.SearchPage
+import io.github.eonewg.gnome.feature.search.SearchRoute
 import io.github.eonewg.gnome.ui.page.memos.TagMemoPage
 import io.github.eonewg.gnome.ui.page.resource.ResourceListPage
 import io.github.eonewg.gnome.ui.page.settings.SettingsPage
@@ -124,7 +124,7 @@ fun Navigation() {
 
 
                 composable(RouteName.SEARCH) {
-                    SearchPage(navController = navController)
+                    SearchRoute(navController = navController)
                 }
 
                 composable("${RouteName.TAG}/{tag}") { entry ->

@@ -60,8 +60,6 @@ fun MemosList(
     memos: List<Memo>,
     contentPadding: PaddingValues,
     lazyListState: LazyListState = rememberLazyListState(),
-    tag: String? = null,
-    searchString: String? = null,
     date: LocalDate? = null,
     additionalBottomPadding: Dp = 16.dp,
     onRefresh: (suspend () -> Unit)? = null,
@@ -88,24 +86,9 @@ fun MemosList(
     var isRefreshing by remember { mutableStateOf(false) }
     var syncAlert by remember { mutableStateOf<PullRefreshSyncAlert?>(null) }
     val localOffset = remember { OffsetDateTime.now().offset }
-    val filteredMemos by remember(memos, tag, searchString, date, sortOrder, localOffset) {
+    val filteredMemos by remember(memos, date, sortOrder, localOffset) {
         derivedStateOf {
             var fullList = orderMemosForTimeline(memos, sortOrder)
-
-            tag?.let { tag ->
-                fullList = fullList.filter { memo ->
-                    memo.content.contains("#$tag") ||
-                        memo.content.contains("#$tag/")
-                }
-            }
-
-            searchString?.let { searchString ->
-                if (searchString.isNotEmpty()) {
-                    fullList = fullList.filter { memo ->
-                        memo.content.contains(searchString, true)
-                    }
-                }
-            }
 
             date?.let { selectedDate ->
                 fullList = fullList.filter { memo ->
