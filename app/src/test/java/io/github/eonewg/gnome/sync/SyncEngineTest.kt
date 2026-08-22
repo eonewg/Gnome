@@ -17,7 +17,7 @@ import io.github.eonewg.gnome.data.model.Memo
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.Resource
 import io.github.eonewg.gnome.data.model.User
-import io.github.eonewg.gnome.data.repository.RemoteRepository
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -49,7 +49,7 @@ class SyncEngineTest {
 
     private val memoDao = FakeMemoDao()
     private val operationDao = FakeSyncOperationDao()
-    private val remote = FakeRemoteRepository()
+    private val remote = FakeRemoteDataSource()
     private var syncedUser: User? = null
 
     private val engine = SyncEngine(
@@ -532,7 +532,7 @@ class FakeSyncOperationDao : SyncOperationDao {
     }
 }
 
-class FakeRemoteRepository : RemoteRepository() {
+class FakeRemoteDataSource : RemoteDataSource() {
     val memos = linkedMapOf<String, Memo>()
     val createdContents = mutableListOf<String>()
     val updatedContents = mutableListOf<Pair<String, String?>>()

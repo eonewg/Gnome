@@ -5,12 +5,12 @@ import androidx.paging.PagingState
 import com.skydoves.sandwich.getOrThrow
 import com.skydoves.sandwich.mapSuccess
 import io.github.eonewg.gnome.data.model.Memo
-import io.github.eonewg.gnome.data.repository.RemoteRepository
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 
 const val EXPLORE_PAGE_SIZE = 20
 
 class ExplorePagingSource(
-    private val remoteRepository: RemoteRepository
+    private val remoteRepository: RemoteDataSource
 ) : PagingSource<String, Memo>() {
 
     override fun getRefreshKey(state: PagingState<String, Memo>): String? {

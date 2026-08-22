@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.data.repository
+package io.github.eonewg.gnome.data.remote.memos
 
 import com.skydoves.sandwich.ApiResponse
 import com.skydoves.sandwich.getOrNull
@@ -7,6 +7,7 @@ import com.skydoves.sandwich.onSuccess
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.data.api.ApiResourceName
 import io.github.eonewg.gnome.data.api.MemosV1Api
 import io.github.eonewg.gnome.data.api.MemosV1CreateMemoRequest
@@ -26,10 +27,10 @@ import java.time.Instant
 
 private const val PAGE_SIZE = 200
 
-class MemosV1Repository(
+class MemosV1RemoteDataSource(
     private val memosApi: MemosV1Api,
     private val account: Account.MemosV1
-): RemoteRepository() {
+): RemoteDataSource() {
     private val remoteUserIdentifier = account.info.remoteIdentifier
 
     private fun convertResource(resource: MemosV1Resource): Resource {

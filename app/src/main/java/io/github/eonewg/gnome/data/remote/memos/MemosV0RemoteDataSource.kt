@@ -1,6 +1,7 @@
-package io.github.eonewg.gnome.data.repository
+package io.github.eonewg.gnome.data.remote.memos
 
 import com.skydoves.sandwich.ApiResponse
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import com.skydoves.sandwich.mapSuccess
 import io.github.eonewg.gnome.data.api.MemosRowStatus
 import io.github.eonewg.gnome.data.api.MemosV0Api
@@ -21,10 +22,10 @@ import okhttp3.MediaType
 import okhttp3.MultipartBody
 import java.time.Instant
 
-class MemosV0Repository (
+class MemosV0RemoteDataSource (
     private val memosApi: MemosV0Api,
     private val account: Account.MemosV0,
-) : RemoteRepository() {
+) : RemoteDataSource() {
     private fun convertResource(resource: MemosV0Resource): Resource {
         return Resource(
             remoteId = resource.id.toString(),

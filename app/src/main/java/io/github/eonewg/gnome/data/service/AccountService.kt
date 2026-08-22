@@ -37,9 +37,9 @@ import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.model.UserSettings
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.repository.LocalDatabaseRepository
-import io.github.eonewg.gnome.data.repository.MemosV0Repository
-import io.github.eonewg.gnome.data.repository.MemosV1Repository
-import io.github.eonewg.gnome.data.repository.RemoteRepository
+import io.github.eonewg.gnome.data.remote.memos.MemosV0RemoteDataSource
+import io.github.eonewg.gnome.data.remote.memos.MemosV1RemoteDataSource
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.data.repository.SyncingRepository
 import io.github.eonewg.gnome.ext.settingsDataStore
 import io.github.eonewg.gnome.ext.string
@@ -128,7 +128,7 @@ class AccountService @Inject constructor(
     )
 
     @Volatile
-    private var remoteRepository: RemoteRepository? = null
+    private var remoteRepository: RemoteDataSource? = null
 
     private val mutex = Mutex()
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -162,14 +162,14 @@ class AccountService @Inject constructor(
             }
             is Account.MemosV0 -> {
                 val (client, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
-                val remote = MemosV0Repository(memosApi, account)
+                val remote = MemosV0RemoteDataSource(memosApi, account)
                 this.repository = buildSyncingRepository(remote, account)
                 this.remoteRepository = remote
                 this.httpClient = client
             }
             is Account.MemosV1 -> {
                 val (client, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
-                val remote = MemosV1Repository(memosApi, account)
+                val remote = MemosV1RemoteDataSource(memosApi, account)
                 this.repository = buildSyncingRepository(remote, account)
                 this.remoteRepository = remote
                 this.httpClient = client
@@ -177,7 +177,7 @@ class AccountService @Inject constructor(
         }
     }
 
-    private fun buildSyncingRepository(remote: RemoteRepository, account: Account): SyncingRepository {
+    private fun buildSyncingRepository(remote: RemoteDataSource, account: Account): SyncingRepository {
         val localData = LocalMemoDataSource(
             database.memoDao(),
             database.syncOperationDao(),
@@ -216,14 +216,14 @@ class AccountService @Inject constructor(
                 is Account.MemosV0 -> {
                     val (_, memosApi) = createMemosV0Client(account.info.host, account.info.accessToken)
                     SyncingRepositoryHandle(
-                        buildSyncingRepository(MemosV0Repository(memosApi, account), account),
+                        buildSyncingRepository(MemosV0RemoteDataSource(memosApi, account), account),
                         ownsLifecycle = true,
                     )
                 }
                 is Account.MemosV1 -> {
                     val (_, memosApi) = createMemosV1Client(account.info.host, account.info.accessToken)
                     SyncingRepositoryHandle(
-                        buildSyncingRepository(MemosV1Repository(memosApi, account), account),
+                        buildSyncingRepository(MemosV1RemoteDataSource(memosApi, account), account),
                         ownsLifecycle = true,
                     )
                 }
@@ -537,7 +537,7 @@ class AccountService @Inject constructor(
         }
     }
 
-    suspend fun getRemoteRepository(): RemoteRepository? {
+    suspend fun getRemoteDataSource(): RemoteDataSource? {
         awaitInitialization()
         mutex.withLock {
             return remoteRepository

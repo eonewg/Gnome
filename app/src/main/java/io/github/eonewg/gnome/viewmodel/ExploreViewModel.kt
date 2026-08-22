@@ -28,7 +28,7 @@ class ExploreViewModel @Inject constructor(
                 return@flatMapLatest flowOf(PagingData.empty<Memo>())
             }
 
-            val remoteRepository = accountService.getRemoteRepository()
+            val remoteRepository = accountService.getRemoteDataSource()
                 ?: return@flatMapLatest flowOf(PagingData.empty<Memo>())
 
             Pager(PagingConfig(pageSize = EXPLORE_PAGE_SIZE)) {

@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.data.repository
+package io.github.eonewg.gnome.data.remote
 
 import com.skydoves.sandwich.ApiResponse
 import io.github.eonewg.gnome.data.model.Memo
@@ -9,7 +9,7 @@ import okhttp3.MediaType
 import java.io.InputStream
 import java.time.Instant
 
-abstract class RemoteRepository {
+abstract class RemoteDataSource {
     abstract suspend fun listMemos(): ApiResponse<List<Memo>>
     abstract suspend fun listArchivedMemos(): ApiResponse<List<Memo>>
     abstract suspend fun listWorkspaceMemos(pageSize: Int, pageToken: String?): ApiResponse<Pair<List<Memo>, String?>>

@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.data.repository
+package io.github.eonewg.gnome.data.remote.memos
 
 import android.util.Base64
 import android.util.Base64OutputStream

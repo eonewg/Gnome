@@ -13,6 +13,7 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.SyncStatus
 import io.github.eonewg.gnome.data.model.User
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.sync.SyncEngine
 import io.github.eonewg.gnome.sync.SyncFileStore
 import io.github.eonewg.gnome.sync.SyncScheduler
@@ -49,7 +50,7 @@ import java.util.UUID
 class SyncingRepository(
     private val localData: LocalMemoDataSource,
     private val fileStorage: FileStorage,
-    private val remoteRepository: RemoteRepository,
+    private val remoteRepository: RemoteDataSource,
     private val account: Account,
     private val syncScheduler: SyncScheduler,
     private val onUserSynced: suspend (User) -> Unit = {},

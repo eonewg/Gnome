@@ -1,4 +1,4 @@
-package io.github.eonewg.gnome.data.repository
+package io.github.eonewg.gnome.data.remote.memos
 
 import io.github.eonewg.gnome.data.api.MemosV1Resource
 import io.github.eonewg.gnome.data.api.MemosV1State
@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
 
-class MemosV1RepositoryTest {
+class MemosV1RemoteDataSourceTest {
     @Test
     fun buildsRequiredV030UpdateMaskFromChangedFields() {
         val request = UpdateMemoRequest(

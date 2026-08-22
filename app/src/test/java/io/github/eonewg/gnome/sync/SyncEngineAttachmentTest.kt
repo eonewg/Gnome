@@ -32,7 +32,7 @@ class SyncEngineAttachmentTest {
 
     private val memoDao = FakeMemoDao()
     private val operationDao = FakeSyncOperationDao()
-    private val remote = FakeRemoteRepository()
+    private val remote = FakeRemoteDataSource()
     private val deletedFiles = mutableListOf<String>()
 
     private val engine = SyncEngine(

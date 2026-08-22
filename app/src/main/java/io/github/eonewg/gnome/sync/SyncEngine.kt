@@ -14,7 +14,7 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.Memo
 import io.github.eonewg.gnome.data.model.Resource
 import io.github.eonewg.gnome.data.model.User
-import io.github.eonewg.gnome.data.repository.RemoteRepository
+import io.github.eonewg.gnome.data.remote.RemoteDataSource
 import io.github.eonewg.gnome.ext.getErrorMessage
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import java.io.File
@@ -27,7 +27,7 @@ import java.util.UUID
  * mutex covers both manual syncs and SyncWorker runs in this process).
  *
  * Reaches Room exclusively through [LocalMemoDataSource] and the server
- * exclusively through [RemoteRepository].
+ * exclusively through [RemoteDataSource].
  *
  * Strategy (kept from the original implementation, intentionally simple):
  * pull the full server snapshot, reconcile it against Room row-by-row using
@@ -36,7 +36,7 @@ import java.util.UUID
 class SyncEngine(
     private val localData: LocalMemoDataSource,
     private val fileStore: SyncFileStore,
-    private val remoteRepository: RemoteRepository,
+    private val remoteRepository: RemoteDataSource,
     private val account: Account,
     private val onUserSynced: suspend (User) -> Unit = {},
 ) {
@@ -491,12 +491,12 @@ class SyncEngine(
 
     private fun remoteMemoId(memo: Memo): String {
         return memo.remoteId.takeIf { it.isNotBlank() }
-            ?: throw IllegalStateException("RemoteRepository must return memos with non-empty remoteId")
+            ?: throw IllegalStateException("RemoteDataSource must return memos with non-empty remoteId")
     }
 
     private fun remoteResourceId(resource: Resource): String {
         return resource.remoteId.takeIf { it.isNotBlank() }
-            ?: throw IllegalStateException("RemoteRepository must return resources with non-empty remoteId")
+            ?: throw IllegalStateException("RemoteDataSource must return resources with non-empty remoteId")
     }
 
     private fun consumeDetailedSyncError(): String? {
