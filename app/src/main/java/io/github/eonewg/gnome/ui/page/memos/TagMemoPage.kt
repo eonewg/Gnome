@@ -16,6 +16,7 @@ import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.viewmodel.LocalMemos
 import io.github.eonewg.gnome.ui.page.common.RouteName
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,6 +52,7 @@ fun TagMemoPage(
 
         content = { innerPadding ->
             MemosList(
+                memos = LocalMemos.current.domainMemos,
                 contentPadding = innerPadding,
                 tag = tag,
                 onTagClick = { clickedTag ->

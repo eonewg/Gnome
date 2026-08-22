@@ -88,7 +88,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.skydoves.sandwich.ApiResponse
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.SyncStatusBadge
@@ -138,9 +138,9 @@ fun MemosHomePage(
     var showBatchDeleteDialog by remember { mutableStateOf(false) }
     var batchOperationRunning by remember { mutableStateOf(false) }
     val currentShowMemoInput by rememberUpdatedState(showMemoInput)
-    val selectedMemos = remember(memosViewModel.memos, selectedMemoIds, sortOrder) {
-        orderMemosForTimeline(memosViewModel.memos, sortOrder)
-            .filter { it.identifier in selectedMemoIds }
+    val selectedMemos = remember(memosViewModel.domainMemos, selectedMemoIds, sortOrder) {
+        orderMemosForTimeline(memosViewModel.domainMemos, sortOrder)
+            .filter { it.id in selectedMemoIds }
     }
 
     fun exitSelectionMode() {
@@ -150,11 +150,11 @@ fun MemosHomePage(
         showBatchDeleteDialog = false
     }
 
-    fun toggleMemoSelection(memo: MemoEntity) {
-        selectedMemoIds = if (memo.identifier in selectedMemoIds) {
-            selectedMemoIds - memo.identifier
+    fun toggleMemoSelection(memo: Memo) {
+        selectedMemoIds = if (memo.id in selectedMemoIds) {
+            selectedMemoIds - memo.id
         } else {
-            selectedMemoIds + memo.identifier
+            selectedMemoIds + memo.id
         }
     }
 
@@ -198,9 +198,9 @@ fun MemosHomePage(
                         "#$tag ${memo.content}"
                     }
                     val response = memosViewModel.editMemo(
-                        memoIdentifier = memo.identifier,
+                        memoIdentifier = memo.id,
                         content = updatedContent,
-                        resourceList = memo.resources,
+                        attachments = memo.attachments,
                         visibility = memo.visibility,
                     )
                     if (response !is ApiResponse.Success) {
@@ -228,7 +228,7 @@ fun MemosHomePage(
             batchOperationRunning = true
             var failedCount = 0
             targets.forEach { memo ->
-                if (memosViewModel.deleteMemo(memo.identifier) !is ApiResponse.Success) {
+                if (memosViewModel.deleteMemo(memo.id) !is ApiResponse.Success) {
                     failedCount++
                 }
             }
@@ -437,6 +437,7 @@ fun MemosHomePage(
 
             content = { innerPadding ->
                 MemosList(
+                    memos = memosViewModel.domainMemos,
                     lazyListState = listState,
                     contentPadding = innerPadding,
                     additionalBottomPadding = if (selectionMode) 8.dp else MemoListFabAvoidancePadding,

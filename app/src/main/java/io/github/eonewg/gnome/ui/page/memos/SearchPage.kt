@@ -37,6 +37,7 @@ import kotlinx.coroutines.delay
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.viewmodel.LocalMemos
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.net.URLEncoder
@@ -121,6 +122,7 @@ fun SearchPage(navController: NavHostController) {
 
         content = { innerPadding ->
             MemosList(
+                memos = LocalMemos.current.domainMemos,
                 contentPadding = innerPadding,
                 searchString = searchText.text,
                 onTagClick = { tag ->

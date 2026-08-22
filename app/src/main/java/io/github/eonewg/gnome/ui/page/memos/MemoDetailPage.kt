@@ -51,6 +51,7 @@ import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
 import io.github.eonewg.gnome.ui.component.MemoContent
+import io.github.eonewg.gnome.core.model.toDomain
 import io.github.eonewg.gnome.ui.component.MemosCardActionButton
 import io.github.eonewg.gnome.ui.component.toMemoTimestamp
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
@@ -107,7 +108,7 @@ fun MemoDetailPage(
                     }
                 },
                 actions = {
-                    memo?.let { MemosCardActionButton(it) }
+                    memo?.let { MemosCardActionButton(it.toDomain(it.resources)) }
                 }
             )
         }

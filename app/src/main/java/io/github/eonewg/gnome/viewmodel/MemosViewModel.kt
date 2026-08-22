@@ -24,6 +24,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import io.github.eonewg.gnome.data.constant.MemosVersionSupport
 import io.github.eonewg.gnome.data.constant.GnomeException
+import io.github.eonewg.gnome.core.model.Attachment
+import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.MemoVisibility as CoreVisibility
+import io.github.eonewg.gnome.core.model.toData
+import io.github.eonewg.gnome.core.model.toDomain
 import io.github.eonewg.gnome.data.local.entity.MemoEntity
 import io.github.eonewg.gnome.data.local.entity.ResourceEntity
 import io.github.eonewg.gnome.data.model.DailyUsageStat
@@ -49,6 +54,10 @@ class MemosViewModel @Inject constructor(
 
     var memos by mutableStateOf<List<MemoEntity>>(emptyList())
         private set
+
+    /** The same snapshot projected into domain models for migrated UI. */
+    val domainMemos: List<Memo>
+        get() = memos.map { it.toDomain(it.resources) }
     var tags by mutableStateOf<List<String>>(emptyList())
         private set
     var errorMessage: String? by mutableStateOf(null)
@@ -188,6 +197,31 @@ class MemosViewModel @Inject constructor(
             updateMemo(data)
             // Update widgets after editing a memo
             WidgetUpdater.updateWidgets(appContext)
+        }
+    }
+
+    /** Domain-typed edit used by migrated components (checkbox toggles, batch tag). */
+    suspend fun editMemo(memoIdentifier: String, content: String, attachments: List<Attachment>?, visibility: CoreVisibility): ApiResponse<Memo> = withContext(viewModelScope.coroutineContext) {
+        memoService.getMemoRepository().updateMemo(memoIdentifier, content, attachments, visibility).also { response ->
+            if (response is ApiResponse.Success) {
+                applyMemoUpdate(response.data)
+                WidgetUpdater.updateWidgets(appContext)
+            }
+        }
+    }
+
+    private fun applyMemoUpdate(memo: Memo) {
+        val index = memos.indexOfFirst { it.identifier == memo.id }
+        if (index != -1) {
+            val existing = memos[index]
+            memos = memos.toMutableList().also {
+                it[index] = existing.copy(
+                    content = memo.content,
+                    pinned = memo.pinned,
+                    visibility = memo.visibility.toData(),
+                    lastModified = memo.lastModified,
+                )
+            }
         }
     }
 

@@ -17,6 +17,7 @@ import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.UserData
 import io.github.eonewg.gnome.data.repository.AbstractMemoRepository
 import io.github.eonewg.gnome.data.remote.RemoteDataSource
+import io.github.eonewg.gnome.data.repository.MemoRepository
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,6 +77,9 @@ class AccountService @Inject constructor(
     }
 
     suspend fun getRepository(): AbstractMemoRepository = session.getRepository()
+
+    /** The current account's repository under the domain-typed contract. */
+    suspend fun getMemoRepository(): MemoRepository = session.getMemoRepository()
 
     suspend fun getRemoteDataSource(): RemoteDataSource? = session.getRemoteDataSource()
 

@@ -1,7 +1,7 @@
 package io.github.eonewg.gnome.ui.page.memos
 
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -10,9 +10,8 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 class MemoDateFilterTest {
-    private val memo = MemoEntity(
-        identifier = "memo",
-        accountKey = "test",
+    private val memo = Memo(
+        id = "memo",
         content = "content",
         date = Instant.parse("2026-08-20T16:30:00Z"),
         visibility = MemoVisibility.PRIVATE,

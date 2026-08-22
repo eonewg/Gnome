@@ -1,7 +1,7 @@
 package io.github.eonewg.gnome.ui.page.memos
 
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
-import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.MemoVisibility
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
@@ -49,7 +49,7 @@ class MemoSortOrderTest {
     private fun assertOrder(sortOrder: MemoSortOrder, vararg identifiers: String) {
         assertEquals(
             identifiers.toList(),
-            orderMemosForTimeline(memos, sortOrder).map { it.identifier },
+            orderMemosForTimeline(memos, sortOrder).map { it.id },
         )
     }
 
@@ -58,9 +58,8 @@ class MemoSortOrderTest {
         created: Long,
         updated: Long,
         pinned: Boolean = false,
-    ) = MemoEntity(
-        identifier = identifier,
-        accountKey = "test",
+    ) = Memo(
+        id = identifier,
         content = identifier,
         date = Instant.ofEpochSecond(created),
         visibility = MemoVisibility.PRIVATE,

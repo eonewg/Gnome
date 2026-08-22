@@ -17,6 +17,7 @@ import androidx.navigation.NavHostController
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.viewmodel.LocalMemos
 import io.github.eonewg.gnome.ui.page.common.RouteName
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import java.net.URLEncoder
@@ -64,6 +65,7 @@ fun DateMemoPage(
         },
     ) { innerPadding ->
         MemosList(
+            memos = LocalMemos.current.domainMemos,
             contentPadding = innerPadding,
             date = date,
             onTagClick = { tag ->

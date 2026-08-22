@@ -59,7 +59,8 @@ import androidx.compose.ui.unit.dp
 import com.skydoves.sandwich.suspendOnSuccess
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
+import io.github.eonewg.gnome.core.model.SyncState
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoEditGesture
 import io.github.eonewg.gnome.ext.icon
@@ -75,21 +76,22 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun MemosCard(
-    memo: MemoEntity,
-    onClick: (MemoEntity) -> Unit,
+    memo: Memo,
+    onClick: (Memo) -> Unit,
     editGesture: MemoEditGesture = MemoEditGesture.NONE,
     previewMode: Boolean = false,
     showSyncStatus: Boolean = false,
     onTagClick: ((String) -> Unit)? = null,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    onSelectionToggle: ((MemoEntity) -> Unit)? = null,
+    onSelectionToggle: ((Memo) -> Unit)? = null,
 ) {
     val memosViewModel = LocalMemos.current
     val rootNavController = LocalRootNavController.current
     val scope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
-    var previewExpanded by rememberSaveable(memo.identifier) { mutableStateOf(false) }
+    val representable = remember(memo) { memo.toRepresentable() }
+    var previewExpanded by rememberSaveable(memo.id) { mutableStateOf(false) }
 
     val cardModifier = Modifier
         .fillMaxWidth()
@@ -98,21 +100,21 @@ fun MemosCard(
                 if (selectionMode) {
                     onSelectionToggle?.invoke(memo)
                 } else if (editGesture == MemoEditGesture.SINGLE) {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
+                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
                 } else {
                     onClick(memo)
                 }
             },
             onLongClick = if (editGesture == MemoEditGesture.LONG) {
                 {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
+                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
                 }
             } else {
                 null
             },
             onDoubleClick = if (editGesture == MemoEditGesture.DOUBLE) {
                 {
-                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
+                    rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
                 }
             } else {
                 null
@@ -149,7 +151,7 @@ fun MemosCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = colors.textSecondary,
                 )
-                if (showSyncStatus && memo.needsSync) {
+                if (showSyncStatus && memo.syncState != SyncState.SYNCED) {
                     Icon(
                         imageVector = Icons.Outlined.CloudOff,
                         contentDescription = R.string.memo_sync_pending.string,
@@ -159,10 +161,10 @@ fun MemosCard(
                         tint = MaterialTheme.colorScheme.error
                     )
                 }
-                if (LocalUserState.current.currentUser?.defaultVisibility != memo.visibility) {
+                if (LocalUserState.current.currentUser?.defaultVisibility != representable.visibility) {
                     Icon(
-                        memo.visibility.icon,
-                        contentDescription = stringResource(memo.visibility.titleResource),
+                        representable.visibility.icon,
+                        contentDescription = stringResource(representable.visibility.titleResource),
                         modifier = Modifier
                             .padding(start = 5.dp)
                             .size(18.dp),
@@ -176,7 +178,7 @@ fun MemosCard(
             }
 
             MemoContent(
-                memo,
+                representable,
                 previewMode = previewMode,
                 checkboxChange = { checked, startOffset, endOffset ->
                     if (selectionMode) {
@@ -191,9 +193,9 @@ fun MemosCard(
                             text.replace("[x]", "[ ]")
                         }
                         memosViewModel.editMemo(
-                            memo.identifier,
+                            memo.id,
                             memo.content.replaceRange(startOffset, endOffset, text),
-                            memo.resources,
+                            memo.attachments,
                             memo.visibility
                         )
                     }
@@ -242,7 +244,7 @@ private fun MemoSelectionIndicator(
 
 @Composable
 fun MemosCardActionButton(
-    memo: MemoEntity,
+    memo: Memo,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -301,7 +303,7 @@ fun MemosCardActionButton(
                     label = R.string.edit.string,
                     onClick = {
                         menuExpanded = false
-                        rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.identifier}")
+                        rootNavController.navigate("${RouteName.EDIT}?memoId=${memo.id}")
                     },
                 )
                 MemoQuickAction(
@@ -328,7 +330,7 @@ fun MemosCardActionButton(
                 onClick = {
                     scope.launch {
                         memosViewModel.updateMemoPinned(
-                            memo.identifier,
+                            memo.id,
                             !memo.pinned,
                         ).suspendOnSuccess {
                             menuExpanded = false
@@ -348,7 +350,7 @@ fun MemosCardActionButton(
                     },
                     onClick = {
                         memosViewModel.host.value?.let { host ->
-                            val memoUrl = "$host/${memo.remoteId ?: memo.identifier}"
+                            val memoUrl = "$host/${memo.remoteId ?: memo.id}"
                             clipboardManager?.setPrimaryClip(
                                 ClipData.newPlainText(R.string.copy_link.string, memoUrl)
                             )
@@ -368,7 +370,7 @@ fun MemosCardActionButton(
                 },
                 onClick = {
                     scope.launch {
-                        memosViewModel.archiveMemo(memo.identifier).suspendOnSuccess {
+                        memosViewModel.archiveMemo(memo.id).suspendOnSuccess {
                             menuExpanded = false
                         }
                     }
@@ -409,7 +411,7 @@ fun MemosCardActionButton(
                 TextButton(
                     onClick = {
                         scope.launch {
-                            memosViewModel.deleteMemo(memo.identifier).suspendOnSuccess {
+                            memosViewModel.deleteMemo(memo.id).suspendOnSuccess {
                                 showDeleteDialog = false
                             }
                         }
@@ -468,7 +470,7 @@ private fun MemoQuickAction(
 }
 @Composable
 private fun MemoActionMetadata(
-    memo: MemoEntity,
+    memo: Memo,
 ) {
     val colors = GnomeDesign.colors
     Column(

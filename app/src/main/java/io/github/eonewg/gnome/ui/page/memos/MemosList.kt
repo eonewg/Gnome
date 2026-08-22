@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoEditGesture
 import io.github.eonewg.gnome.data.model.Settings
@@ -60,14 +60,14 @@ enum class MemoSortOrder {
 }
 
 internal fun orderMemosForTimeline(
-    memos: List<MemoEntity>,
+    memos: List<Memo>,
     sortOrder: MemoSortOrder,
-): List<MemoEntity> {
+): List<Memo> {
     val comparator = when (sortOrder) {
-        MemoSortOrder.CreatedNewest -> compareByDescending<MemoEntity> { it.date }
-        MemoSortOrder.CreatedOldest -> compareBy<MemoEntity> { it.date }
-        MemoSortOrder.UpdatedNewest -> compareByDescending<MemoEntity> { it.lastModified }
-        MemoSortOrder.UpdatedOldest -> compareBy<MemoEntity> { it.lastModified }
+        MemoSortOrder.CreatedNewest -> compareByDescending<Memo> { it.date }
+        MemoSortOrder.CreatedOldest -> compareBy<Memo> { it.date }
+        MemoSortOrder.UpdatedNewest -> compareByDescending<Memo> { it.lastModified }
+        MemoSortOrder.UpdatedOldest -> compareBy<Memo> { it.lastModified }
     }
     val pinned = memos.filter { it.pinned }.sortedWith(comparator)
     val nonPinned = memos.filter { !it.pinned }.sortedWith(comparator)
@@ -77,6 +77,7 @@ internal fun orderMemosForTimeline(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MemosList(
+    memos: List<Memo>,
     contentPadding: PaddingValues,
     lazyListState: LazyListState = rememberLazyListState(),
     tag: String? = null,
@@ -88,7 +89,8 @@ fun MemosList(
     sortOrder: MemoSortOrder = MemoSortOrder.CreatedNewest,
     selectionMode: Boolean = false,
     selectedMemoIds: Set<String> = emptySet(),
-    onSelectionToggle: ((MemoEntity) -> Unit)? = null,
+    onSelectionToggle: ((Memo) -> Unit)? = null,
+    loadOnStart: Boolean = true,
 ) {
     val context = LocalContext.current
     val layoutDirection = LocalLayoutDirection.current
@@ -106,9 +108,9 @@ fun MemosList(
     var isRefreshing by remember { mutableStateOf(false) }
     var syncAlert by remember { mutableStateOf<PullRefreshSyncAlert?>(null) }
     val localOffset = remember { OffsetDateTime.now().offset }
-    val filteredMemos by remember(tag, searchString, date, sortOrder, localOffset) {
+    val filteredMemos by remember(memos, tag, searchString, date, sortOrder, localOffset) {
         derivedStateOf {
-            var fullList = orderMemosForTimeline(viewModel.memos, sortOrder)
+            var fullList = orderMemosForTimeline(memos, sortOrder)
 
             tag?.let { tag ->
                 fullList = fullList.filter { memo ->
@@ -185,14 +187,14 @@ fun MemosList(
         ) {
             items(
                 items = filteredMemos,
-                key = { it.identifier },
+                key = { it.id },
                 contentType = { "memo" }
             ) { memo ->
                 MemosCard(
                     memo = memo,
                     onClick = { selectedMemo ->
                         navController.navigate(
-                            "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.identifier)}"
+                            "${RouteName.MEMO_DETAIL}?memoId=${Uri.encode(selectedMemo.id)}"
                         )
                     },
                     editGesture = if (selectionMode) MemoEditGesture.NONE else editGesture ?: MemoEditGesture.NONE,
@@ -200,7 +202,7 @@ fun MemosList(
                     showSyncStatus = currentAccount !is Account.Local,
                     onTagClick = if (selectionMode) null else onTagClick,
                     selectionMode = selectionMode,
-                    selected = memo.identifier in selectedMemoIds,
+                    selected = memo.id in selectedMemoIds,
                     onSelectionToggle = onSelectionToggle,
                 )
             }
@@ -213,16 +215,18 @@ fun MemosList(
         }
     }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadMemos()
+    if (loadOnStart) {
+        LaunchedEffect(Unit) {
+            viewModel.loadMemos()
+        }
     }
 
-    LaunchedEffect(filteredMemos.firstOrNull()?.identifier) {
-        if (listTopId != null && filteredMemos.isNotEmpty() && listTopId != filteredMemos.first().identifier) {
+    LaunchedEffect(filteredMemos.firstOrNull()?.id) {
+        if (listTopId != null && filteredMemos.isNotEmpty() && listTopId != filteredMemos.first().id) {
             lazyListState.scrollToItem(0)
         }
 
-        listTopId = filteredMemos.firstOrNull()?.identifier
+        listTopId = filteredMemos.firstOrNull()?.id
     }
 
     when (val alert = syncAlert) {
@@ -290,7 +294,7 @@ fun MemosList(
 }
 
 internal fun memoMatchesDate(
-    memo: MemoEntity,
+    memo: Memo,
     date: LocalDate,
     offset: ZoneOffset,
 ): Boolean = memo.date.atOffset(offset).toLocalDate() == date

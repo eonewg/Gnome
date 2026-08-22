@@ -51,7 +51,7 @@ class AccountSession @Inject constructor(
         private set
 
     @Volatile
-    private var repository: AbstractMemoRepository = MemoRepositoryImpl(
+    private var repository: MemoRepositoryImpl = MemoRepositoryImpl(
         localMemoDataSource(),
         fileStorage,
         Account.Local(LocalAccount()),
@@ -80,6 +80,12 @@ class AccountSession @Inject constructor(
     }
 
     suspend fun getRepository(): AbstractMemoRepository {
+        awaitInitialization()
+        return mutex.withLock { repository }
+    }
+
+    /** The current account's repository under the domain-typed contract. */
+    suspend fun getMemoRepository(): MemoRepository {
         awaitInitialization()
         return mutex.withLock { repository }
     }
