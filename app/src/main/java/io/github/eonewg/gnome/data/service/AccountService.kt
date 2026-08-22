@@ -35,8 +35,9 @@ import javax.inject.Singleton
  * the order persistence-write → session rebuild → purge, matching the
  * pre-split behavior.
  */
+// Open for the ViewModel unit tests, which subclass with in-memory fakes.
 @Singleton
-class AccountService @Inject constructor(
+open class AccountService @Inject constructor(
     private val accountStore: AccountStore,
     private val session: AccountSession,
     private val memosClientFactory: MemosClientFactory,
@@ -47,7 +48,7 @@ class AccountService @Inject constructor(
 
     val accounts get() = accountStore.accounts
 
-    val currentAccount get() = accountStore.currentAccount
+    open val currentAccount get() = accountStore.currentAccount
 
     val httpClient: OkHttpClient get() = session.httpClient
 
@@ -98,7 +99,7 @@ class AccountService @Inject constructor(
         return compatibilityChecker.checkLoginCompatibility(host, allowHigherV1Version)
     }
 
-    suspend fun checkCurrentAccountSyncCompatibility(
+    open suspend fun checkCurrentAccountSyncCompatibility(
         isAutomatic: Boolean,
         allowHigherV1Version: String? = null,
     ): SyncCompatibility {
@@ -107,7 +108,7 @@ class AccountService @Inject constructor(
         return compatibilityChecker.checkAccountSyncCompatibility(account, isAutomatic, allowHigherV1Version)
     }
 
-    suspend fun rememberAcceptedUnsupportedSyncVersion(version: String) {
+    open suspend fun rememberAcceptedUnsupportedSyncVersion(version: String) {
         session.awaitInitialization()
         val accountKey = currentAccount.first()?.accountKey() ?: return
         accountStore.rememberAcceptedUnsupportedSyncVersion(accountKey, version)

@@ -14,9 +14,10 @@ import io.github.eonewg.gnome.data.repository.MemoRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// Open for the ViewModel unit tests, which subclass with in-memory fakes.
 @Singleton
 @OptIn(ExperimentalCoroutinesApi::class)
-class MemoService @Inject constructor(
+open class MemoService @Inject constructor(
     private val accountService: AccountService,
 ) {
     private var lastSyncTime = 0L
@@ -28,11 +29,11 @@ class MemoService @Inject constructor(
     }
 
     /** The current account's repository under the domain-typed contract. */
-    suspend fun getMemoRepository(): MemoRepository {
+    open suspend fun getMemoRepository(): MemoRepository {
         return accountService.getMemoRepository()
     }
 
-    val syncStatus: Flow<SyncStatus> = accountService.currentAccount.flatMapLatest {
+    open val syncStatus: Flow<SyncStatus> = accountService.currentAccount.flatMapLatest {
         accountService.getRepository().syncStatus
     }
 
@@ -41,11 +42,11 @@ class MemoService @Inject constructor(
     }
 
     /** Timeline as domain models — the read path new UI code uses. */
-    val domainMemos: Flow<List<Memo>> = accountService.currentAccount.flatMapLatest {
+    open val domainMemos: Flow<List<Memo>> = accountService.currentAccount.flatMapLatest {
         accountService.getMemoRepository().observeTimeline()
     }
 
-    suspend fun sync(force: Boolean): ApiResponse<Unit> {
+    open suspend fun sync(force: Boolean): ApiResponse<Unit> {
         return syncMutex.withLock {
             val now = System.currentTimeMillis()
             if (!force && (now - lastSyncTime) <= syncThreshold) {
