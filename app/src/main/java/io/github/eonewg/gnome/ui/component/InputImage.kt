@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,19 +23,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
+import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.ext.string
-import io.github.eonewg.gnome.viewmodel.MemoInputViewModel
 
 @Composable
 fun InputImage(
-    resource: ResourceEntity,
-    inputViewModel: MemoInputViewModel
+    resource: ResourceRepresentable,
+    onRemove: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
     Box {
         AsyncImage(
@@ -59,15 +55,13 @@ fun InputImage(
             DropdownMenuItem(
                 text = { Text(R.string.remove.string) },
                 onClick = {
-                    scope.launch {
-                        inputViewModel.deleteResource(resource.identifier)
-                        menuExpanded = false
-                    }
+                    onRemove()
+                    menuExpanded = false
                 },
                 leadingIcon = {
                     Icon(
                         Icons.Outlined.Delete,
-                        contentDescription = null
+                        contentDescription = null,
                     )
                 })
         }

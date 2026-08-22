@@ -39,6 +39,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import io.github.eonewg.gnome.GnomeFileProvider
+import io.github.eonewg.gnome.core.model.toDomain
+import io.github.eonewg.gnome.data.model.Account
 import io.github.eonewg.gnome.data.model.MemoVisibility
 import io.github.eonewg.gnome.data.model.ShareContent
 import io.github.eonewg.gnome.ext.popBackStackIfLifecycleIsResumed
@@ -209,8 +211,8 @@ fun MemoInputPage(
                     onDroppedText = { droppedText ->
                         text = text.copy(text = text.text + droppedText)
                     },
-                    uploadResources = viewModel.uploadResources.toList(),
-                    inputViewModel = viewModel,
+                    attachments = viewModel.uploadResources.map { it.toDomain() },
+                    onDeleteAttachment = { viewModel.deleteResource(it) },
                     tagSuggestions = tagSuggestions,
                     compactTagSuggestions = true,
                     onTagSuggestionSelected = { tag ->
@@ -221,7 +223,7 @@ fun MemoInputPage(
                     },
                 )
                 MemoInputBottomBar(
-                    currentAccount = currentAccount,
+                    isLocalAccount = currentAccount is Account.Local,
                     currentVisibility = currentVisibility,
                     visibilityMenuExpanded = visibilityMenuExpanded,
                     onVisibilityExpandedChange = { visibilityMenuExpanded = it },
@@ -278,7 +280,7 @@ fun MemoInputPage(
         },
         bottomBar = {
             MemoInputBottomBar(
-                currentAccount = currentAccount,
+                isLocalAccount = currentAccount is Account.Local,
                 currentVisibility = currentVisibility,
                 visibilityMenuExpanded = visibilityMenuExpanded,
                 onVisibilityExpandedChange = { visibilityMenuExpanded = it },
@@ -347,8 +349,8 @@ fun MemoInputPage(
             onDroppedText = { droppedText ->
                 text = text.copy(text = text.text + droppedText)
             },
-            uploadResources = viewModel.uploadResources.toList(),
-            inputViewModel = viewModel,
+            attachments = viewModel.uploadResources.map { it.toDomain() },
+            onDeleteAttachment = { viewModel.deleteResource(it) },
             tagSuggestions = tagSuggestions,
             compactTagSuggestions = isBottomSheet,
             onTagSuggestionSelected = { tag ->

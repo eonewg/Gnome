@@ -87,17 +87,17 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import io.github.eonewg.gnome.R
-import io.github.eonewg.gnome.data.local.entity.ResourceEntity
-import io.github.eonewg.gnome.data.model.Account
+import io.github.eonewg.gnome.core.model.Attachment as DomainAttachment
 import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.data.model.ResourceRepresentable
 import io.github.eonewg.gnome.ext.icon
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ext.titleResource
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.InputImage
+import io.github.eonewg.gnome.ui.component.toResourceRepresentable
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import io.github.eonewg.gnome.util.findCustomTagMatches
-import io.github.eonewg.gnome.viewmodel.MemoInputViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -166,7 +166,7 @@ private fun FormattingButtons(
 
 @Composable
 internal fun MemoInputBottomBar(
-    currentAccount: Account?,
+    isLocalAccount: Boolean,
     currentVisibility: MemoVisibility,
     visibilityMenuExpanded: Boolean,
     onVisibilityExpandedChange: (Boolean) -> Unit,
@@ -214,7 +214,7 @@ internal fun MemoInputBottomBar(
                     )
                 }
 
-                if (currentAccount !is Account.Local) {
+                if (!isLocalAccount) {
                     Box {
                         DropdownMenu(
                             expanded = visibilityMenuExpanded,
@@ -306,8 +306,8 @@ internal fun MemoInputEditor(
     focusRequester: FocusRequester,
     validMimeTypePrefixes: Set<String>,
     onDroppedText: (String) -> Unit,
-    uploadResources: List<ResourceEntity>,
-    inputViewModel: MemoInputViewModel,
+    attachments: List<DomainAttachment>,
+    onDeleteAttachment: (String) -> Unit,
     tagSuggestions: List<String>,
     compactTagSuggestions: Boolean = false,
     onTagSuggestionSelected: (String) -> Unit,
@@ -328,11 +328,11 @@ internal fun MemoInputEditor(
             TransformedText(highlighted, OffsetMapping.Identity)
         }
     }
-    val imageResources = remember(uploadResources) {
-        uploadResources.filter { it.mimeType?.startsWith("image/") == true }
+    val imageResources = remember(attachments) {
+        attachments.filter { it.mimeType?.startsWith("image/") == true }
     }
-    val attachmentResources = remember(uploadResources) {
-        uploadResources.filterNot { it.mimeType?.startsWith("image/") == true }
+    val attachmentResources = remember(attachments) {
+        attachments.filterNot { it.mimeType?.startsWith("image/") == true }
     }
 
     Column(
@@ -445,8 +445,11 @@ internal fun MemoInputEditor(
                     ),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(imageResources, key = { it.identifier }) { resource ->
-                    InputImage(resource = resource, inputViewModel = inputViewModel)
+                items(imageResources, key = { it.id }) { resource ->
+                    InputImage(
+                        resource = resource.toResourceRepresentable(),
+                        onRemove = { onDeleteAttachment(resource.id) },
+                    )
                 }
             }
         }
@@ -457,10 +460,10 @@ internal fun MemoInputEditor(
                     .padding(start = 15.dp, end = 15.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                items(attachmentResources, key = { it.identifier }) { resource ->
+                items(attachmentResources, key = { it.id }) { resource ->
                     Attachment(
-                        resource = resource,
-                        onRemove = { inputViewModel.deleteResource(resource.identifier) }
+                        resource = resource.toResourceRepresentable(),
+                        onRemove = { onDeleteAttachment(resource.id) }
                     )
                 }
             }
