@@ -1,0 +1,51 @@
+package io.github.eonewg.gnome.data.repository
+
+import com.skydoves.sandwich.ApiResponse
+import io.github.eonewg.gnome.data.model.Memo
+import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.data.model.Resource
+import io.github.eonewg.gnome.data.model.User
+import okhttp3.MediaType
+import java.io.InputStream
+import java.time.Instant
+
+abstract class RemoteRepository {
+    abstract suspend fun listMemos(): ApiResponse<List<Memo>>
+    abstract suspend fun listArchivedMemos(): ApiResponse<List<Memo>>
+    abstract suspend fun listWorkspaceMemos(pageSize: Int, pageToken: String?): ApiResponse<Pair<List<Memo>, String?>>
+
+    abstract suspend fun createMemo(
+        content: String,
+        visibility: MemoVisibility,
+        resourceRemoteIds: List<String>,
+        tags: List<String>? = null,
+        createdAt: Instant? = null
+    ): ApiResponse<Memo>
+
+    abstract suspend fun updateMemo(
+        remoteId: String,
+        content: String? = null,
+        resourceRemoteIds: List<String>? = null,
+        visibility: MemoVisibility? = null,
+        tags: List<String>? = null,
+        pinned: Boolean? = null,
+        archived: Boolean? = null
+    ): ApiResponse<Memo>
+
+    abstract suspend fun deleteMemo(remoteId: String): ApiResponse<Unit>
+
+    abstract suspend fun listTags(): ApiResponse<List<String>>
+
+    abstract suspend fun listResources(): ApiResponse<List<Resource>>
+
+    abstract suspend fun createResource(
+        filename: String,
+        type: MediaType?,
+        contentLength: Long?,
+        openInputStream: () -> InputStream,
+        memoRemoteId: String? = null
+    ): ApiResponse<Resource>
+
+    abstract suspend fun deleteResource(remoteId: String): ApiResponse<Unit>
+    abstract suspend fun getCurrentUser(): ApiResponse<User>
+}

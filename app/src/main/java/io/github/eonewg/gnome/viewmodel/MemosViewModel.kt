@@ -1,0 +1,249 @@
+package io.github.eonewg.gnome.viewmodel
+
+import android.content.Context
+import android.net.Uri
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.skydoves.sandwich.ApiResponse
+import com.skydoves.sandwich.suspendOnSuccess
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import io.github.eonewg.gnome.data.constant.MemosVersionSupport
+import io.github.eonewg.gnome.data.constant.GnomeException
+import io.github.eonewg.gnome.data.local.entity.MemoEntity
+import io.github.eonewg.gnome.data.local.entity.ResourceEntity
+import io.github.eonewg.gnome.data.model.DailyUsageStat
+import io.github.eonewg.gnome.data.model.MemoVisibility
+import io.github.eonewg.gnome.data.model.SyncStatus
+import io.github.eonewg.gnome.data.service.AccountService
+import io.github.eonewg.gnome.data.service.MemoService
+import io.github.eonewg.gnome.ext.getErrorMessage
+import io.github.eonewg.gnome.ext.string
+import io.github.eonewg.gnome.util.extractCustomTags
+import io.github.eonewg.gnome.widget.WidgetUpdater
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import javax.inject.Inject
+
+@HiltViewModel
+class MemosViewModel @Inject constructor(
+    private val memoService: MemoService,
+    private val accountService: AccountService,
+    @param:ApplicationContext private val appContext: Context
+) : ViewModel() {
+
+    var memos by mutableStateOf<List<MemoEntity>>(emptyList())
+        private set
+    var tags by mutableStateOf<List<String>>(emptyList())
+        private set
+    var errorMessage: String? by mutableStateOf(null)
+        private set
+    var matrix by mutableStateOf(DailyUsageStat.initialMatrix)
+        private set
+
+    val host: StateFlow<String?> =
+        accountService.currentAccount
+            .map { it?.getAccountInfo()?.host }
+            .distinctUntilChanged()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    val syncStatus: StateFlow<SyncStatus> =
+        memoService.syncStatus.stateIn(viewModelScope, SharingStarted.Eagerly, SyncStatus())
+
+    init {
+        viewModelScope.launch {
+            var hasPresentedLocalSnapshot = false
+            combine(memoService.memos, memoService.syncStatus) { latestMemos, status ->
+                latestMemos to status
+            }
+                .distinctUntilChanged()
+                .collectLatest { (latestMemos, status) ->
+                    if (!hasPresentedLocalSnapshot || !status.syncing) {
+                        applyMemos(latestMemos)
+                        hasPresentedLocalSnapshot = true
+                    }
+                }
+        }
+    }
+
+    suspend fun refreshLocalSnapshot() = withContext(viewModelScope.coroutineContext) {
+        when (val response = memoService.getRepository().listMemos()) {
+            is ApiResponse.Success -> applyMemos(response.data)
+            else -> errorMessage = response.getErrorMessage()
+        }
+    }
+
+    private suspend fun applyMemos(latestMemos: List<MemoEntity>) {
+        val snapshot = latestMemos.toList()
+        if (memos != snapshot) {
+            val (preparedMatrix, preparedTags) = withContext(Dispatchers.Default) {
+                val matrix = calculateMatrix(snapshot)
+                val tags = snapshot
+                    .asSequence()
+                    .flatMap { extractCustomTags(it.content).asSequence() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .sorted()
+                    .toList()
+                matrix to tags
+            }
+            memos = snapshot
+            matrix = preparedMatrix
+            if (tags != preparedTags) {
+                tags = preparedTags
+            }
+        }
+        errorMessage = null
+    }
+
+    suspend fun loadMemos(syncAfterLoad: Boolean = true) = withContext(viewModelScope.coroutineContext) {
+        if (syncAfterLoad) {
+            val compatibility = accountService.checkCurrentAccountSyncCompatibility(isAutomatic = true)
+            if (compatibility !is AccountService.SyncCompatibility.Allowed) {
+                return@withContext
+            }
+
+            val syncResult = memoService.sync(false)
+            if (syncResult is ApiResponse.Success) {
+                WidgetUpdater.updateWidgets(appContext)
+            } else {
+                if (!syncResult.isAccessTokenInvalidFailure()) {
+                    errorMessage = syncResult.getErrorMessage()
+                }
+            }
+        }
+    }
+
+    suspend fun refreshMemos(allowHigherV1Version: String? = null): ManualSyncResult = withContext(viewModelScope.coroutineContext) {
+        when (val compatibility = accountService.checkCurrentAccountSyncCompatibility(
+            isAutomatic = false,
+            allowHigherV1Version = allowHigherV1Version
+        )) {
+            is AccountService.SyncCompatibility.Blocked -> {
+                return@withContext ManualSyncResult.Blocked(
+                    compatibility.message ?: MemosVersionSupport.supportedVersionsMessage(appContext)
+                )
+            }
+            is AccountService.SyncCompatibility.RequiresConfirmation -> {
+                return@withContext ManualSyncResult.RequiresConfirmation(
+                    version = compatibility.version,
+                    message = compatibility.message
+                )
+            }
+            AccountService.SyncCompatibility.Allowed -> Unit
+        }
+
+        val syncResult = memoService.sync(true)
+        if (syncResult is ApiResponse.Success) {
+            if (allowHigherV1Version != null) {
+                accountService.rememberAcceptedUnsupportedSyncVersion(allowHigherV1Version)
+            }
+            WidgetUpdater.updateWidgets(appContext)
+        } else {
+            val message = syncResult.getErrorMessage()
+            errorMessage = message
+            return@withContext ManualSyncResult.Failed(message)
+        }
+        ManualSyncResult.Completed
+    }
+
+    private fun ApiResponse<Unit>.isAccessTokenInvalidFailure(): Boolean {
+        return this is ApiResponse.Failure.Exception && this.throwable == GnomeException.accessTokenInvalid
+    }
+
+    fun loadTags() = viewModelScope.launch {
+        memoService.getRepository().listTags().suspendOnSuccess {
+            val snapshot = data.filter { it.isNotBlank() }.distinct()
+            if (tags != snapshot) {
+                tags = snapshot
+            }
+        }
+    }
+
+    suspend fun updateMemoPinned(memoIdentifier: String, pinned: Boolean) = withContext(viewModelScope.coroutineContext) {
+        memoService.getRepository().updateMemo(memoIdentifier, pinned = pinned).suspendOnSuccess {
+            updateMemo(data)
+            // Update widgets after pinning/unpinning a memo
+            WidgetUpdater.updateWidgets(appContext)
+        }
+    }
+
+    suspend fun editMemo(memoIdentifier: String, content: String, resourceList: List<ResourceEntity>?, visibility: MemoVisibility): ApiResponse<MemoEntity> = withContext(viewModelScope.coroutineContext) {
+        memoService.getRepository().updateMemo(memoIdentifier, content, resourceList, visibility).suspendOnSuccess {
+            updateMemo(data)
+            // Update widgets after editing a memo
+            WidgetUpdater.updateWidgets(appContext)
+        }
+    }
+
+    suspend fun archiveMemo(memoIdentifier: String) = withContext(viewModelScope.coroutineContext) {
+        memoService.getRepository().archiveMemo(memoIdentifier).suspendOnSuccess {
+            memos = memos.filterNot { it.identifier == memoIdentifier }
+            // Update widgets after archiving a memo
+            WidgetUpdater.updateWidgets(appContext)
+        }
+    }
+
+    suspend fun deleteMemo(memoIdentifier: String) = withContext(viewModelScope.coroutineContext) {
+        memoService.getRepository().deleteMemo(memoIdentifier).suspendOnSuccess {
+            memos = memos.filterNot { it.identifier == memoIdentifier }
+            // Update widgets after deleting a memo
+            WidgetUpdater.updateWidgets(appContext)
+        }
+    }
+
+    suspend fun cacheResourceFile(resourceIdentifier: String, downloadedUri: Uri): ApiResponse<Unit> = withContext(viewModelScope.coroutineContext) {
+        memoService.getRepository().cacheResourceFile(resourceIdentifier, downloadedUri)
+    }
+
+    suspend fun getResourceById(resourceIdentifier: String): ResourceEntity? = withContext(viewModelScope.coroutineContext) {
+        when (val response = memoService.getRepository().listResources()) {
+            is ApiResponse.Success -> response.data.firstOrNull { it.identifier == resourceIdentifier }
+            else -> null
+        }
+    }
+
+    private fun updateMemo(memo: MemoEntity) {
+        val index = memos.indexOfFirst { it.identifier == memo.identifier }
+        if (index != -1) {
+            memos = memos.toMutableList().also { it[index] = memo }
+        }
+    }
+
+    private fun calculateMatrix(source: List<MemoEntity>): List<DailyUsageStat> {
+        val countMap = HashMap<LocalDate, Int>()
+
+        for (memo in source) {
+            val date = memo.date.atZone(OffsetDateTime.now().offset).toLocalDate()
+            countMap[date] = (countMap[date] ?: 0) + 1
+        }
+
+        return DailyUsageStat.initialMatrix.map {
+            it.copy(count = countMap[it.date] ?: 0)
+        }
+    }
+}
+
+val LocalMemos =
+    compositionLocalOf<MemosViewModel> { error(io.github.eonewg.gnome.R.string.memos_view_model_not_found.string) }
+
+sealed class ManualSyncResult {
+    object Completed : ManualSyncResult()
+    data class Blocked(val message: String) : ManualSyncResult()
+    data class RequiresConfirmation(val version: String, val message: String) : ManualSyncResult()
+    data class Failed(val message: String) : ManualSyncResult()
+}

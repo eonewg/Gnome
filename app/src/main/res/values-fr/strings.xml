@@ -28,7 +28,7 @@
     <string name="about">À propos de Gnome</string>
     <string name="add_account">S\'identifier</string>
     <string name="attachment">Pièce jointe</string>
-    <string name="moe_memos" translatable="false">Gnome</string>
+    <string name="gnome" translatable="false">Gnome</string>
     <string name="selected">Sélectionné</string>
     <string name="username_and_password">Nom d\'utilisateur et mot de passe</string>
     <string name="report_an_issue">Signaler un problème</string>

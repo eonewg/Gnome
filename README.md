@@ -46,6 +46,9 @@ Download the signed APK from the [Releases](https://github.com/eonewg/Gnome/rele
 ./gradlew assembleRelease
 ```
 
+> [!IMPORTANT]
+> Starting with the `io.github.eonewg.gnome` application identity, Gnome installs as a **new app** next to any previously installed copy — previous in-place upgrades do not apply. To migrate: install the new version, sign in to your Memos server again, and all server-synced memos will be downloaded automatically. Memos stored only in a **local (no-server) account** cannot be migrated automatically — use the old app's *Export* feature first to keep a ZIP copy of your data.
+
 Looking for the original app? Moe Memos is available on [F-Droid](https://f-droid.org/packages/me.mudkip.moememos/) and [Google Play](https://play.google.com/store/apps/details?id=me.mudkip.moememos).
 
 ## Development

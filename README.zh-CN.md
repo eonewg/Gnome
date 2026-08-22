@@ -46,6 +46,9 @@ Gnome 是一款帮助你记录想法与灵感的 App，提供 flomo 风格的低
 ./gradlew assembleRelease
 ```
 
+> [!IMPORTANT]
+> 自采用 `io.github.eonewg.gnome` 应用身份起，Gnome 将作为**全新应用**安装，与旧版本（`me.mudkip.moememos`）不构成原地升级，两者可并存。迁移方式：安装新版后重新登录你的 Memos 服务器，已同步到服务器的 Memo 会自动下载。**本地（无服务器）账号**的数据无法自动迁移，请先在旧版中使用「导出」功能保留数据的 ZIP 副本。
+
 如果你要找的是原版应用：Moe Memos 可在 [F-Droid](https://f-droid.org/packages/me.mudkip.moememos/) 和 [Google Play](https://play.google.com/store/apps/details?id=me.mudkip.moememos) 下载。
 
 ## 开发

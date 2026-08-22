@@ -7,8 +7,8 @@
         android:shortcutShortLabel="@string/new_memo">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="me.mudkip.moememos"
-            android:targetClass="me.mudkip.moememos.MainActivity">
+            android:targetPackage="io.github.eonewg.gnome"
+            android:targetClass="io.github.eonewg.gnome.MainActivity">
             <extra android:name="action" android:value="compose" />
         </intent>
     </shortcut>
@@ -19,8 +19,8 @@
         android:shortcutShortLabel="@string/search">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="me.mudkip.moememos"
-            android:targetClass="me.mudkip.moememos.MainActivity">
+            android:targetPackage="io.github.eonewg.gnome"
+            android:targetClass="io.github.eonewg.gnome.MainActivity">
             <extra android:name="action" android:value="search" />
         </intent>
     </shortcut>

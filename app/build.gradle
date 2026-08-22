@@ -28,7 +28,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "me.mudkip.moememos"
+        applicationId = "io.github.eonewg.gnome"
         minSdk = 26
         targetSdk = 36
         versionCode = 51
@@ -74,7 +74,7 @@ android {
         }
     }
 
-    namespace = 'me.mudkip.moememos'
+    namespace = 'io.github.eonewg.gnome'
 }
 
 dependencies {
