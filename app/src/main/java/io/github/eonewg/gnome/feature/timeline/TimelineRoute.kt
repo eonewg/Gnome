@@ -5,6 +5,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -44,6 +47,7 @@ import androidx.core.view.ViewCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.eonewg.gnome.R
@@ -61,13 +65,27 @@ import timber.log.Timber
 
 @Composable
 fun TimelineRoute(
+    viewModelStoreOwner: ViewModelStoreOwner,
     drawerState: DrawerState? = null,
     navigator: GnomeNavigator,
     quickMemoRequestId: Long = 0L,
     onMemoInputActiveChange: (Boolean) -> Unit = {},
 ) {
-    val timelineViewModel: TimelineViewModel = hiltViewModel()
+    val timelineViewModel: TimelineViewModel = hiltViewModel(viewModelStoreOwner)
     val uiState by timelineViewModel.uiState.collectAsStateWithLifecycle()
+
+    val timelineContentAlpha = remember {
+        Animatable(if (uiState.isLoaded) 1f else 0f)
+    }
+
+    LaunchedEffect(uiState.isLoaded) {
+        if (uiState.isLoaded && timelineContentAlpha.value < 1f) {
+            timelineContentAlpha.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(TimelineFirstContentEnterDurationMillis, easing = FastOutSlowInEasing),
+            )
+        }
+    }
 
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -218,6 +236,7 @@ fun TimelineRoute(
         TimelineScreen(
             uiState = uiState,
             snackbarHostState = snackbarState,
+            contentAlpha = timelineContentAlpha.value,
             listState = listState,
             showNavigationMenu = drawerState != null,
             onMenuClick = {
@@ -331,3 +350,4 @@ fun TimelineRoute(
 }
 
 private val HiddenMemoInputOffset = 1_000.dp
+private const val TimelineFirstContentEnterDurationMillis = 180

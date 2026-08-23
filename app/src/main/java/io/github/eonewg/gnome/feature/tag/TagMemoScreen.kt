@@ -110,5 +110,5 @@ private data class TagContentState(
     val uiState: TagMemoUiState,
 )
 
-private const val TagExitDurationMillis = 90
-private const val TagEnterDurationMillis = 150
+private const val TagExitDurationMillis = 100
+private const val TagEnterDurationMillis = 170

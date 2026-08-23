@@ -112,6 +112,13 @@ class TimelineViewModelTest {
     }
 
     @Test
+    fun `empty Room snapshot is loaded content`() = runTest(testDispatcher) {
+        val viewModel = newViewModel()
+        val loadedState = viewModel.uiState.first { it.isLoaded }
+        assertTrue(loadedState.memos.isEmpty())
+    }
+
+    @Test
     fun `tags are derived from timeline contents, deduplicated and sorted`() = runTest(testDispatcher) {
         val viewModel = newViewModel()
         memoService.domainMemoState.value = listOf(

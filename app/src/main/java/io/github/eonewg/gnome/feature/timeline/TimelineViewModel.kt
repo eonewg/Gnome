@@ -106,9 +106,9 @@ class TimelineViewModel @Inject constructor(
                     .sorted()
                     .toList()
             }
-            _uiState.update { it.copy(memos = snapshot, tags = preparedTags) }
+            _uiState.update { it.copy(memos = snapshot, tags = preparedTags, isLoaded = true) }
         }
-        _uiState.update { it.copy(errorMessage = null) }
+        _uiState.update { it.copy(isLoaded = true, errorMessage = null) }
     }
 
     suspend fun loadMemos(syncAfterLoad: Boolean = true) = withContext(viewModelScope.coroutineContext) {

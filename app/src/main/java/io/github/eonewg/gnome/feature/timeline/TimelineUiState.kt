@@ -7,6 +7,7 @@ import io.github.eonewg.gnome.data.model.SyncStatus
 /** Immutable snapshot of everything the timeline screen renders. */
 data class TimelineUiState(
     val memos: List<Memo> = emptyList(),
+    val isLoaded: Boolean = false,
     val tags: List<String> = emptyList(),
     val sortOrder: MemoSortOrder = MemoSortOrder.CreatedNewest,
     val selectionMode: Boolean = false,

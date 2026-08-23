@@ -41,6 +41,7 @@ import androidx.core.net.toUri
 import androidx.core.util.Consumer
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -135,6 +136,9 @@ fun Navigation() {
     val currentAccount by accountSessionViewModel.currentAccount.collectAsStateWithLifecycle()
     val hasExplore = currentAccount !is Account.Local
     val context = LocalContext.current
+    // Drawer roots replace NavEntries; the host owner keeps the Timeline snapshot warm
+    // without retaining those roots in the navigation back stack.
+    val timelineViewModelStoreOwner = checkNotNull(LocalViewModelStoreOwner.current)
     var shareContent by rememberSaveable(stateSaver = ShareContentSaver) {
         mutableStateOf<ShareContent?>(null)
     }
@@ -190,6 +194,7 @@ fun Navigation() {
     val entryProvider = entryProvider<NavKey> {
         entry<TimelineKey> {
             TimelineRoute(
+                viewModelStoreOwner = timelineViewModelStoreOwner,
                 drawerState = drawerState,
                 navigator = navigator,
                 quickMemoRequestId = quickMemoRequestId,
@@ -448,5 +453,5 @@ fun Navigation() {
 }
 
 private const val TagDestinationContentKey = "TagDestination"
-private const val TopLevelExitDurationMillis = 100
-private const val TopLevelEnterDurationMillis = 150
+private const val TopLevelExitDurationMillis = 120
+private const val TopLevelEnterDurationMillis = 180
