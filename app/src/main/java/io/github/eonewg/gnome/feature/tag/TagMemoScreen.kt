@@ -1,5 +1,14 @@
 package io.github.eonewg.gnome.feature.tag
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.DrawerState
@@ -13,8 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.consumeWindowInsets
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
@@ -33,6 +40,13 @@ fun TagMemoScreen(
     val scope = rememberCoroutineScope()
     val normalizedCurrentTag = remember(tag) { tag.removePrefix("#") }
 
+    // Never show the previous tag snapshot under the new title while the Room flow switches.
+    val matchingUiState = if (uiState.tag == tag) {
+        uiState
+    } else {
+        uiState.copy(tag = tag, memos = emptyList())
+    }
+    val contentState = TagContentState(tag = tag, uiState = matchingUiState)
     Scaffold(
         topBar = {
             TopAppBar(
@@ -48,21 +62,53 @@ fun TagMemoScreen(
         },
 
         content = { innerPadding ->
-            MemosList(
-                memos = uiState.memos,
-                contentPadding = innerPadding,
-                loadOnStart = false,
-                onTagClick = { clickedTag ->
-                    if (clickedTag.removePrefix("#") == normalizedCurrentTag) {
-                        return@MemosList
-                    }
-                    onTagClick(clickedTag)
+            AnimatedContent(
+                targetState = contentState,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    fadeIn(
+                        animationSpec = tween(
+                            durationMillis = TagEnterDurationMillis,
+                            easing = FastOutSlowInEasing,
+                        )
+                    ) togetherWith fadeOut(
+                        animationSpec = tween(
+                            durationMillis = TagExitDurationMillis,
+                            easing = FastOutSlowInEasing,
+                        )
+                    ) using SizeTransform(
+                        clip = false,
+                        sizeAnimationSpec = { _, _ -> snap() },
+                    )
                 },
-                isRemoteAccount = uiState.isRemoteAccount,
-                host = uiState.host,
-                defaultVisibility = uiState.defaultVisibility,
-                actions = actions,
-            )
+                // Only a real tag change animates; same-tag Room emissions update in place.
+                contentKey = { it.tag },
+                label = "TagMemoContent",
+            ) { state ->
+                MemosList(
+                    memos = state.uiState.memos,
+                    contentPadding = innerPadding,
+                    loadOnStart = false,
+                    onTagClick = { clickedTag ->
+                        if (clickedTag.removePrefix("#") == normalizedCurrentTag) {
+                            return@MemosList
+                        }
+                        onTagClick(clickedTag)
+                    },
+                    isRemoteAccount = state.uiState.isRemoteAccount,
+                    host = state.uiState.host,
+                    defaultVisibility = state.uiState.defaultVisibility,
+                    actions = actions,
+                )
+            }
         }
     )
 }
+
+private data class TagContentState(
+    val tag: String,
+    val uiState: TagMemoUiState,
+)
+
+private const val TagExitDurationMillis = 90
+private const val TagEnterDurationMillis = 150

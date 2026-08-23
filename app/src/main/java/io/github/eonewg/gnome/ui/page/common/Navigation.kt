@@ -209,7 +209,8 @@ fun Navigation() {
             SearchRoute(navigator = navigator)
         }
 
-        entry<TagKey> { key ->
+        // Reuse one Tag composition so the Scaffold stays stable while only its content animates.
+        entry<TagKey>(clazzContentKey = { TagDestinationContentKey }) { key ->
             TagMemoRoute(
                 drawerState = drawerState,
                 tag = key.tag,
@@ -287,8 +288,20 @@ fun Navigation() {
             onBack = { navigator.goBack() },
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
             transitionSpec = {
-                if (isDrawerSwitchDestination(currentKey)) {
+                if (currentKey is TagKey) {
                     EnterTransition.None togetherWith ExitTransition.None
+                } else if (isDrawerSwitchDestination(currentKey)) {
+                    fadeIn(
+                        animationSpec = tween(
+                            durationMillis = TopLevelEnterDurationMillis,
+                            easing = FastOutSlowInEasing,
+                        )
+                    ) togetherWith fadeOut(
+                        animationSpec = tween(
+                            durationMillis = TopLevelExitDurationMillis,
+                            easing = FastOutSlowInEasing,
+                        )
+                    )
                 } else {
                     (fadeIn() + slideInHorizontally(
                         animationSpec = tween(
@@ -433,3 +446,7 @@ fun Navigation() {
         }
     }
 }
+
+private const val TagDestinationContentKey = "TagDestination"
+private const val TopLevelExitDurationMillis = 100
+private const val TopLevelEnterDurationMillis = 150

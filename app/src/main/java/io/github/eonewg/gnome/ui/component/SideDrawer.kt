@@ -199,20 +199,32 @@ private fun DrawerNavigationItem(
     onClick: () -> Unit,
 ) {
     val colors = GnomeDesign.colors
+    val shape = RoundedCornerShape(15.dp)
+    val motionColors = rememberDrawerItemMotionColors(
+        selected = selected,
+        selectedContainerColor = colors.accent,
+        selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+        selectedTextColor = MaterialTheme.colorScheme.onPrimary,
+        unselectedIconColor = colors.textSecondary,
+        unselectedTextColor = colors.textPrimary,
+    )
     NavigationDrawerItem(
         label = { Text(label, style = MaterialTheme.typography.bodyLarge) },
         icon = { Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp)) },
         selected = selected,
         onClick = onClick,
-        shape = RoundedCornerShape(15.dp),
+        shape = shape,
         colors = NavigationDrawerItemDefaults.colors(
-            selectedContainerColor = colors.accent,
-            selectedIconColor = MaterialTheme.colorScheme.onPrimary,
-            selectedTextColor = MaterialTheme.colorScheme.onPrimary,
+            selectedContainerColor = Color.Transparent,
+            selectedIconColor = motionColors.icon,
+            selectedTextColor = motionColors.text,
             unselectedContainerColor = Color.Transparent,
-            unselectedIconColor = colors.textSecondary,
-            unselectedTextColor = colors.textPrimary,
+            unselectedIconColor = motionColors.icon,
+            unselectedTextColor = motionColors.text,
         ),
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 1.dp).height(48.dp),
+        modifier = Modifier
+            .padding(horizontal = 14.dp, vertical = 1.dp)
+            .background(motionColors.container, shape)
+            .height(48.dp),
     )
 }
