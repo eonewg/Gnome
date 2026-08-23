@@ -144,12 +144,25 @@ fun Navigation() {
     }
     var quickMemoRequestId by remember { mutableStateOf(0L) }
     var memoInputActive by rememberSaveable { mutableStateOf(false) }
+    var drawerNavigationTarget by remember { mutableStateOf<GnomeNavKey?>(null) }
     val colors = GnomeDesign.colors
     val currentKey = backStack.lastOrNull() as? GnomeNavKey
 
-    fun drawerNavigate(action: () -> Unit) {
+    fun drawerNavigate(
+        target: GnomeNavKey? = null,
+        action: () -> Unit,
+    ) {
+        drawerNavigationTarget = target
         action()
-        scope.launch { drawerState.close() }
+        scope.launch {
+            try {
+                drawerState.close()
+            } finally {
+                if (drawerNavigationTarget == target) {
+                    drawerNavigationTarget = null
+                }
+            }
+        }
     }
 
     val drawerContent: @Composable () -> Unit = {
@@ -160,30 +173,28 @@ fun Navigation() {
                 drawerNavigate { navigator.navigate(StatsKey, singleTop = true) }
             },
             onMemosClick = {
-                drawerNavigate { navigator.switchDrawerDestination(TimelineKey) }
+                drawerNavigate(TimelineKey) { navigator.switchDrawerDestination(TimelineKey) }
             },
             onExploreClick = {
-                drawerNavigate {
-                    // Local accounts have no explore feed; keep the drawer item visible
-                    // but fall back to the timeline instead of flashing an empty page.
-                    if (hasExplore) {
-                        navigator.switchDrawerDestination(ExploreKey)
-                    } else {
-                        navigator.switchDrawerDestination(TimelineKey)
-                    }
+                // Local accounts have no explore feed; keep the drawer item visible
+                // but fall back to the timeline instead of flashing an empty page.
+                val target = if (hasExplore) ExploreKey else TimelineKey
+                drawerNavigate(target) {
+                    navigator.switchDrawerDestination(target)
                 }
             },
             onResourcesClick = {
-                drawerNavigate { navigator.switchDrawerDestination(ResourcesKey) }
+                drawerNavigate(ResourcesKey) { navigator.switchDrawerDestination(ResourcesKey) }
             },
             onArchivedClick = {
-                drawerNavigate { navigator.switchDrawerDestination(ArchivedKey) }
+                drawerNavigate(ArchivedKey) { navigator.switchDrawerDestination(ArchivedKey) }
             },
             onSettingsClick = {
-                drawerNavigate { navigator.switchDrawerDestination(SettingsKey) }
+                drawerNavigate(SettingsKey) { navigator.switchDrawerDestination(SettingsKey) }
             },
             onTagClick = { tag ->
-                drawerNavigate { navigator.switchDrawerDestination(TagKey(tag)) }
+                val target = TagKey(tag)
+                drawerNavigate(target) { navigator.switchDrawerDestination(target) }
             },
             onDateClick = { date ->
                 drawerNavigate { navigator.navigate(DateKey(date.toString()), singleTop = true) }
@@ -293,7 +304,18 @@ fun Navigation() {
             onBack = { navigator.goBack() },
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
             transitionSpec = {
-                if (currentKey is TagKey) {
+                // The back stack has already changed here, so currentKey is the incoming key.
+                // A Drawer switch lets the sheet/scrim carry the motion; only the incoming
+                // content gets a near-opaque reveal and the outgoing page never fades away.
+                if (drawerNavigationTarget == currentKey) {
+                    fadeIn(
+                        initialAlpha = DrawerDestinationInitialAlpha,
+                        animationSpec = tween(
+                            durationMillis = DrawerDestinationRevealDurationMillis,
+                            easing = FastOutSlowInEasing,
+                        ),
+                    ) togetherWith ExitTransition.None
+                } else if (currentKey is TagKey) {
                     EnterTransition.None togetherWith ExitTransition.None
                 } else if (isDrawerSwitchDestination(currentKey)) {
                     fadeIn(
@@ -453,5 +475,7 @@ fun Navigation() {
 }
 
 private const val TagDestinationContentKey = "TagDestination"
+private const val DrawerDestinationInitialAlpha = 0.95f
+private const val DrawerDestinationRevealDurationMillis = 180
 private const val TopLevelExitDurationMillis = 120
 private const val TopLevelEnterDurationMillis = 180
