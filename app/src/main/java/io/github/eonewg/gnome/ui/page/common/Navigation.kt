@@ -5,7 +5,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,6 +33,7 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.core.util.Consumer
@@ -262,6 +267,9 @@ fun Navigation() {
     }
 
     val content: @Composable () -> Unit = {
+        // Preserve the low-cost spring fade while adding only a subtle direction cue.
+        // Larger translation or scale makes destination changes feel less direct.
+        val transitionOffsetPx = with(LocalDensity.current) { 8.dp.roundToPx() }
         val entries = rememberDecoratedNavEntries(
             backStack = backStack,
             entryDecorators = listOf(
@@ -275,13 +283,31 @@ fun Navigation() {
             onBack = { navigator.goBack() },
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
             transitionSpec = {
-                fadeIn() togetherWith fadeOut()
+                (fadeIn() + slideInHorizontally(
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = FastOutSlowInEasing,
+                    ),
+                    initialOffsetX = { transitionOffsetPx },
+                )) togetherWith fadeOut()
             },
             popTransitionSpec = {
-                (fadeIn()) togetherWith (fadeOut())
+                fadeIn() togetherWith (fadeOut() + slideOutHorizontally(
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = FastOutSlowInEasing,
+                    ),
+                    targetOffsetX = { transitionOffsetPx },
+                ))
             },
             predictivePopTransitionSpec = { _ ->
-                fadeIn() togetherWith fadeOut()
+                fadeIn() togetherWith (fadeOut() + slideOutHorizontally(
+                    animationSpec = tween(
+                        durationMillis = 200,
+                        easing = FastOutSlowInEasing,
+                    ),
+                    targetOffsetX = { transitionOffsetPx },
+                ))
             },
         )
     }
