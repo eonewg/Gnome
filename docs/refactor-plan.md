@@ -440,8 +440,25 @@ Deferred:
 - 新增 androidTest QuickMemoActivityTest（冷启动 + recreate）：无账号环境自动 SKIP
   （宿主按设计回退 MainActivity）；在有可用账号状态的设备上会真正断言 editor 出现
 
-### Phase 20 — 删除 Moe Memos 遗留命名与死代码
-- In progress（Phase 1 已完成代码级命名；fastlane 元数据等外围遗留随发版流程清理）。
+### Phase 20 — Release Performance Preparation（2026-08-23）
+
+- 审计旧 `baseline-prof.txt`：仅 6 条手写规则，覆盖不足；Profile、ProGuard 中旧
+  `me/mudkip/moememos` 规则为 0。历史说明文档中的旧包名保留作为迁移背景。
+- `ProfileInstaller 1.4.1` 已确认：合并 Manifest 包含 initializer/receiver，最终 APK
+  包含 `assets/dexopt/baseline.prof` 与 `baseline.profm`。
+- 新增 `:benchmark` 模块、`profileTarget` 隔离变体和匿名本地 fixture，正式测试定义覆盖
+  cold launch、Timeline、scroll、open memo、editor、search；三种模式为 NONE、
+  BaselineProfile 和 5 次 warmup 的 speed-profile。
+- OnePlus PJD110 / Android 16 上 `BaselineProfileRule` 能进入测试，但 ColorOS 的
+  UiAutomation 在旅程中长期不返回。为避免继续重试，本轮用相同隔离 APK 在主机侧执行
+  3 轮同等旅程后导出 ART classes/methods，得到 28,864 条有效规则并覆盖旧文件；其中
+  Gnome 自有规则 2,344 条，旧包和 fixture 规则均为 0。ProfileTarget 的 R8/profile
+  编译和 APK 打包均通过。
+- fresh install 后 Dex 初始状态为 `verify/install`；ProfileInstaller 安装后强制
+  `speed-profile` 成功。PJD110 5 次冷启动 `TotalTime`：NONE 155 ms（中位数），
+  BaselineProfile 136 ms，speed-profile 135 ms；Baseline 相对 NONE 改善 12.3%。
+- 前进导航统一为 `fadeIn + fadeOut`，删除上滑/下滑位移；返回仍使用同一淡入淡出，
+  不再出现进入设置、资源等页面时的唐突跳动。
 
 ## 已完成：同步核心架构验收（2026-08-22，commit 10595cde）
 

@@ -4,6 +4,7 @@ plugins {
     id 'com.google.dagger.hilt.android'
     id 'com.google.devtools.ksp'
     id 'org.jetbrains.kotlin.plugin.compose'
+    id 'androidx.baselineprofile'
 }
 
 def releaseSigningStoreFile = System.getenv("ANDROID_SIGNING_STORE_FILE")
@@ -64,6 +65,14 @@ android {
             initWith release
             applicationIdSuffix = ".perf"
             versionNameSuffix = "-perf"
+            signingConfig = signingConfigs.debug
+            debuggable = false
+            matchingFallbacks = ['release']
+        }
+        profileTarget {
+            initWith release
+            applicationIdSuffix = ".benchmark"
+            versionNameSuffix = "-benchmark"
             signingConfig = signingConfigs.debug
             debuggable = false
             matchingFallbacks = ['release']
@@ -155,6 +164,18 @@ dependencies {
     implementation "androidx.glance:glance-appwidget:$glance_version"
     implementation "androidx.glance:glance-material3:$glance_version"
     implementation "androidx.work:work-runtime-ktx:$work_version"
+}
+
+baselineProfile {
+    mergeIntoMain = false
+    saveInSrc = true
+    automaticGenerationDuringBuild = false
+    variants {
+        profileTarget {
+            from(project(':benchmark'))
+            mergeIntoMain = true
+        }
+    }
 }
 
 ksp {
