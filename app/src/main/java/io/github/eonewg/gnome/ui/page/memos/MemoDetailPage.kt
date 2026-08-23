@@ -62,16 +62,14 @@ fun MemoDetailPage(
     onEditMemo: (memoId: String) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
-    val memoDetailViewModel: MemoDetailViewModel = hiltViewModel()
+    val memoDetailViewModel = hiltViewModel<MemoDetailViewModel, MemoDetailViewModel.Factory> { factory ->
+        factory.create(memoIdentifier)
+    }
     val uiState by memoDetailViewModel.uiState.collectAsStateWithLifecycle()
     val memo = uiState.memo
     val scope = rememberCoroutineScope()
     val colors = GnomeDesign.colors
     var hadMemo by rememberSaveable(memoIdentifier) { mutableStateOf(false) }
-
-    LaunchedEffect(memoIdentifier) {
-        memoDetailViewModel.setMemoId(memoIdentifier)
-    }
 
     val memoCardActions = MemoCardActions(
         onEdit = { id ->

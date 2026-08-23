@@ -1,11 +1,11 @@
 package io.github.eonewg.gnome.feature.memo
 
-import androidx.lifecycle.SavedStateHandle
+import io.github.eonewg.gnome.core.model.Memo
 import io.github.eonewg.gnome.data.service.MemoActions
 import io.github.eonewg.gnome.feature.FakeAccountService
 import io.github.eonewg.gnome.feature.FakeMemoRepository
 import io.github.eonewg.gnome.feature.FakeMemoService
-import io.github.eonewg.gnome.core.model.Memo
+import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -22,13 +22,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
-import java.time.Instant
 
 /**
- * The memo id arrives from the typed navigation key via [MemoDetailViewModel.setMemoId]
- * (never from a SavedStateHandle). These tests lock the contract the route relies on:
- * setting the id is idempotent — recomposition must not reset restored state — and a
- * changed id switches the viewed memo.
+ * The memo id arrives from the typed navigation key through the assisted factory.
+ * These tests lock that fixed entry-scoped selection while the live memo flow changes.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -53,7 +50,8 @@ class MemoDetailViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun newViewModel() = MemoDetailViewModel(
+    private fun newViewModel(memoId: String) = MemoDetailViewModel(
+        memoId = memoId,
         memoService = memoService,
         accountService = accountService,
         memoActions = MemoActions(
@@ -70,12 +68,11 @@ class MemoDetailViewModelTest {
     )
 
     @Test
-    fun `setMemoId picks the memo from the live domain flow`() = runTest(testDispatcher) {
+    fun `assisted memo id picks the memo from the live domain flow`() = runTest(testDispatcher) {
         repository.memosById["m1"] = memo("m1", "hello")
         memoService.domainMemoState.value = listOf(memo("m1", "hello"))
-        val viewModel = newViewModel()
+        val viewModel = newViewModel("m1")
 
-        viewModel.setMemoId("m1")
         viewModel.uiState.first { it.memo != null }
 
         assertEquals("m1", viewModel.uiState.value.memo?.id)
@@ -83,42 +80,39 @@ class MemoDetailViewModelTest {
     }
 
     @Test
-    fun `setMemoId is idempotent for repeated same-id calls`() = runTest(testDispatcher) {
+    fun `assisted memo id stays selected across live updates`() = runTest(testDispatcher) {
         repository.memosById["m1"] = memo("m1")
         memoService.domainMemoState.value = listOf(memo("m1"))
-        val viewModel = newViewModel()
-
-        // Recompositions re-run LaunchedEffect-keyed calls with the same value.
-        viewModel.setMemoId("m1")
-        viewModel.setMemoId("m1")
-        viewModel.setMemoId("m1")
+        val viewModel = newViewModel("m1")
         viewModel.uiState.first { it.memo != null }
 
+        memoService.domainMemoState.value = listOf(memo("m1", "updated"))
+        viewModel.uiState.first { it.memo?.content == "updated" }
+
         assertEquals("m1", viewModel.uiState.value.memo?.id)
+        assertEquals("updated", viewModel.uiState.value.memo?.content)
     }
 
     @Test
-    fun `setMemoId switches to the new id without stale state`() = runTest(testDispatcher) {
+    fun `separate assisted ids select separate memos`() = runTest(testDispatcher) {
         repository.memosById["m1"] = memo("m1")
         repository.memosById["m2"] = memo("m2")
         memoService.domainMemoState.value = listOf(memo("m1"), memo("m2"))
-        val viewModel = newViewModel()
+        val firstViewModel = newViewModel("m1")
+        val secondViewModel = newViewModel("m2")
 
-        viewModel.setMemoId("m1")
-        viewModel.uiState.first { it.memo?.id == "m1" }
-        viewModel.setMemoId("m2")
-        viewModel.uiState.first { it.memo?.id == "m2" }
+        firstViewModel.uiState.first { it.memo?.id == "m1" }
+        secondViewModel.uiState.first { it.memo?.id == "m2" }
 
-        assertEquals("m2", viewModel.uiState.value.memo?.id)
+        assertEquals("m1", firstViewModel.uiState.value.memo?.id)
+        assertEquals("m2", secondViewModel.uiState.value.memo?.id)
     }
 
     @Test
     fun `unknown id leaves the memo empty like the not-found page`() = runTest(testDispatcher) {
         memoService.domainMemoState.value = listOf(memo("m1"))
-        val viewModel = newViewModel()
+        val viewModel = newViewModel("missing")
 
-        viewModel.setMemoId("missing")
-        // The flow emits with a null memo; no crash, page shows the empty state.
         viewModel.uiState.first { it.memo == null }
 
         assertNull(viewModel.uiState.value.memo)
