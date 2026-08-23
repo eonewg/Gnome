@@ -291,6 +291,9 @@ fun Navigation() {
             popTransitionSpec = {
                 (fadeIn()) togetherWith (fadeOut())
             },
+            predictivePopTransitionSpec = { _ ->
+                fadeIn() togetherWith fadeOut()
+            },
         )
     }
 
