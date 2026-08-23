@@ -3,7 +3,6 @@ package io.github.eonewg.gnome.ui.page.common
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -276,17 +275,7 @@ fun Navigation() {
             onBack = { navigator.goBack() },
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
             transitionSpec = {
-                (
-                    slideIntoContainer(
-                        AnimatedContentTransitionScope.SlideDirection.Up,
-                        initialOffset = { it / 4 },
-                    ) + fadeIn()
-                    ) togetherWith (
-                    slideOutOfContainer(
-                        AnimatedContentTransitionScope.SlideDirection.Down,
-                        targetOffset = { it / 4 },
-                    ) + fadeOut()
-                    )
+                fadeIn() togetherWith fadeOut()
             },
             popTransitionSpec = {
                 (fadeIn()) togetherWith (fadeOut())
