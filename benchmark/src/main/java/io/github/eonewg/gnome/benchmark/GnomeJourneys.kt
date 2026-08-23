@@ -38,7 +38,10 @@ internal object GnomeJourneys {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         context.startActivity(intent)
         requireAny(By.text(FixtureReady))
-        pressBackRaw()
+        // The fixture updates the target process' persisted account state. A
+        // still-running first-run activity can otherwise retain its stale
+        // account snapshot and leave the benchmark on the account picker.
+        device.executeShellCommand("am force-stop $TargetPackage")
         launchFromTestProcess()
         waitForTimeline()
         requireAny(By.textContains(FixtureMemoPrefix))
