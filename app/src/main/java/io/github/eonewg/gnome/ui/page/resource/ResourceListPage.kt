@@ -12,7 +12,9 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -22,6 +24,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -36,6 +39,7 @@ import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.MemoImage
 import io.github.eonewg.gnome.viewmodel.ResourceListViewModel
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items as lazyItems
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredGridItems
 
@@ -48,9 +52,11 @@ private enum class ResourceFilter {
 @Composable
 fun ResourceListPage(
     onBack: () -> Unit,
+    drawerState: DrawerState? = null,
     viewModel: ResourceListViewModel = hiltViewModel()
 ) {
     val resources by viewModel.resources.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     var selectedFilter by rememberSaveable { mutableStateOf(ResourceFilter.IMAGE) }
     val imageResources = resources.filter { it.mimeType?.startsWith("image/") == true }
     val otherResources = resources.filterNot { it.mimeType?.startsWith("image/") == true }
@@ -60,8 +66,14 @@ fun ResourceListPage(
             TopAppBar(
                 title = { Text(text = R.string.resources.string) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
+                    if (drawerState != null) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = R.string.menu.string)
+                        }
+                    } else {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
+                        }
                     }
                 },
             )

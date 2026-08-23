@@ -3,6 +3,8 @@ package io.github.eonewg.gnome.ui.page.common
 import android.content.Intent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -79,6 +81,7 @@ import io.github.eonewg.gnome.nav.StatsKey
 import io.github.eonewg.gnome.nav.TagKey
 import io.github.eonewg.gnome.nav.TimelineKey
 import io.github.eonewg.gnome.nav.isDrawerScoped
+import io.github.eonewg.gnome.nav.isDrawerSwitchDestination
 import io.github.eonewg.gnome.ui.component.SideDrawer
 import io.github.eonewg.gnome.ui.page.account.AccountPage
 import io.github.eonewg.gnome.ui.page.account.AddAccountPage
@@ -115,9 +118,9 @@ private val ShareContentSaver = listSaver<ShareContent?, Any>(
 
 /**
  * The single Navigation 3 host: one typed back stack, one [NavDisplay], and a
- * drawer that only wraps the memo-scoped destinations. The legacy root/inner
- * double NavHost is gone; memo pages (timeline/archived/tag/date/explore/
- * search/detail/edit) are drawer-scoped exactly as the inner graph used to be.
+ * drawer that wraps its root destinations plus memo child pages. The legacy
+ * root/inner double NavHost is gone; drawer roots replace one another while
+ * true child pages continue to push onto the typed stack.
  */
 @Composable
 fun Navigation() {
@@ -141,10 +144,8 @@ fun Navigation() {
     val currentKey = backStack.lastOrNull() as? GnomeNavKey
 
     fun drawerNavigate(action: () -> Unit) {
-        scope.launch {
-            action()
-            drawerState.close()
-        }
+        action()
+        scope.launch { drawerState.close() }
     }
 
     val drawerContent: @Composable () -> Unit = {
@@ -155,30 +156,30 @@ fun Navigation() {
                 drawerNavigate { navigator.navigate(StatsKey, singleTop = true) }
             },
             onMemosClick = {
-                drawerNavigate { navigator.navigate(TimelineKey, singleTop = true) }
+                drawerNavigate { navigator.switchDrawerDestination(TimelineKey) }
             },
             onExploreClick = {
                 drawerNavigate {
                     // Local accounts have no explore feed; keep the drawer item visible
                     // but fall back to the timeline instead of flashing an empty page.
                     if (hasExplore) {
-                        navigator.navigate(ExploreKey, singleTop = true)
+                        navigator.switchDrawerDestination(ExploreKey)
                     } else {
-                        navigator.navigate(TimelineKey, singleTop = true)
+                        navigator.switchDrawerDestination(TimelineKey)
                     }
                 }
             },
             onResourcesClick = {
-                drawerNavigate { navigator.navigate(ResourcesKey) }
+                drawerNavigate { navigator.switchDrawerDestination(ResourcesKey) }
             },
             onArchivedClick = {
-                drawerNavigate { navigator.navigate(ArchivedKey, singleTop = true) }
+                drawerNavigate { navigator.switchDrawerDestination(ArchivedKey) }
             },
             onSettingsClick = {
-                drawerNavigate { navigator.navigate(SettingsKey) }
+                drawerNavigate { navigator.switchDrawerDestination(SettingsKey) }
             },
             onTagClick = { tag ->
-                drawerNavigate { navigator.navigate(TagKey(tag), singleTop = true) }
+                drawerNavigate { navigator.switchDrawerDestination(TagKey(tag)) }
             },
             onDateClick = { date ->
                 drawerNavigate { navigator.navigate(DateKey(date.toString()), singleTop = true) }
@@ -246,11 +247,14 @@ fun Navigation() {
         }
 
         entry<ResourcesKey> {
-            ResourceListPage(onBack = { navigator.goBack() })
+            ResourceListPage(
+                drawerState = drawerState,
+                onBack = { navigator.goBack() },
+            )
         }
 
         entry<SettingsKey> {
-            SettingsPage(navigator = navigator)
+            SettingsPage(drawerState = drawerState, navigator = navigator)
         }
 
         entry<AddAccountKey> {
@@ -283,13 +287,17 @@ fun Navigation() {
             onBack = { navigator.goBack() },
             modifier = Modifier.background(MaterialTheme.colorScheme.surface),
             transitionSpec = {
-                (fadeIn() + slideInHorizontally(
-                    animationSpec = tween(
-                        durationMillis = 200,
-                        easing = FastOutSlowInEasing,
-                    ),
-                    initialOffsetX = { transitionOffsetPx },
-                )) togetherWith fadeOut()
+                if (isDrawerSwitchDestination(currentKey)) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    (fadeIn() + slideInHorizontally(
+                        animationSpec = tween(
+                            durationMillis = 200,
+                            easing = FastOutSlowInEasing,
+                        ),
+                        initialOffsetX = { transitionOffsetPx },
+                    )) togetherWith fadeOut()
+                }
             },
             popTransitionSpec = {
                 fadeIn() togetherWith (fadeOut() + slideOutHorizontally(

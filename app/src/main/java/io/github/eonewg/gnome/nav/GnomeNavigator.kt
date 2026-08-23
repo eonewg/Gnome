@@ -21,6 +21,18 @@ class GnomeNavigator(
         backStack.add(key)
     }
 
+    /**
+     * Switches the drawer's root content without retaining previously visited
+     * drawer destinations in the back stack. Returns false only for a clean
+     * re-selection of the destination already being shown.
+     */
+    fun switchDrawerDestination(key: GnomeNavKey): Boolean {
+        require(isDrawerSwitchDestination(key)) { "$key is not a drawer switch destination" }
+        if (backStack.size == 1 && backStack.lastOrNull() == key) return false
+        resetTo(key)
+        return true
+    }
+
     /** Pops the top entry. Safe to call repeatedly (rapid back). */
     fun goBack() {
         backStack.removeLastOrNull()

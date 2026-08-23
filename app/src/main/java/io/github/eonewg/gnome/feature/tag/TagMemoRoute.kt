@@ -61,7 +61,7 @@ fun TagMemoRoute(
         drawerState = drawerState,
         uiState = uiState,
         onTagClick = { clickedTag ->
-            navigator.navigate(TagKey(clickedTag), singleTop = true)
+            navigator.switchDrawerDestination(TagKey(clickedTag))
         },
         actions = memoCardActions,
     )

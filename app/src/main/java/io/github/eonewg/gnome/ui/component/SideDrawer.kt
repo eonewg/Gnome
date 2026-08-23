@@ -38,6 +38,8 @@ import io.github.eonewg.gnome.feature.drawer.DrawerUiState
 import io.github.eonewg.gnome.nav.ArchivedKey
 import io.github.eonewg.gnome.nav.ExploreKey
 import io.github.eonewg.gnome.nav.GnomeNavKey
+import io.github.eonewg.gnome.nav.ResourcesKey
+import io.github.eonewg.gnome.nav.SettingsKey
 import io.github.eonewg.gnome.nav.TagKey
 import io.github.eonewg.gnome.nav.TimelineKey
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
@@ -139,7 +141,7 @@ fun SideDrawer(
             DrawerNavigationItem(
                 label = R.string.resources.string,
                 icon = Icons.Outlined.PhotoLibrary,
-                selected = false,
+                selected = isSelected(ResourcesKey),
                 onClick = onResourcesClick,
             )
         }
@@ -157,7 +159,7 @@ fun SideDrawer(
             DrawerNavigationItem(
                 label = R.string.settings.string,
                 icon = Icons.Outlined.Settings,
-                selected = false,
+                selected = isSelected(SettingsKey),
                 onClick = onSettingsClick,
             )
         }

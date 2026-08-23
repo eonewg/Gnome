@@ -66,11 +66,25 @@ fun isDrawerScoped(key: NavKey?): Boolean = when (key) {
     is TimelineKey,
     is ArchivedKey,
     is ExploreKey,
+    is ResourcesKey,
+    is SettingsKey,
     is SearchKey,
     is TagKey,
     is DateKey,
     is MemoDetailKey,
     is EditorKey,
+    -> true
+    else -> false
+}
+
+/** Drawer destinations that replace the current root instead of pushing a child page. */
+fun isDrawerSwitchDestination(key: NavKey?): Boolean = when (key) {
+    is TimelineKey,
+    is ExploreKey,
+    is ResourcesKey,
+    is ArchivedKey,
+    is SettingsKey,
+    is TagKey,
     -> true
     else -> false
 }

@@ -49,6 +49,51 @@ class GnomeNavigatorTest {
     }
 
     @Test
+    fun `drawer destination switch replaces previously visited roots`() {
+        val backStack = stackOf(TimelineKey)
+        val navigator = GnomeNavigator(backStack)
+
+        navigator.switchDrawerDestination(ExploreKey)
+        navigator.switchDrawerDestination(ResourcesKey)
+        navigator.switchDrawerDestination(SettingsKey)
+
+        assertEquals(listOf(SettingsKey), backStack)
+    }
+
+    @Test
+    fun `reselecting current drawer destination does not mutate the stack`() {
+        val backStack = stackOf(ExploreKey)
+        val navigator = GnomeNavigator(backStack)
+
+        val changed = navigator.switchDrawerDestination(ExploreKey)
+
+        assertTrue(!changed)
+        assertEquals(listOf(ExploreKey), backStack)
+    }
+
+    @Test
+    fun `switching tags leaves only the requested timeline filter`() {
+        val backStack = stackOf(TagKey("playlist"))
+        val navigator = GnomeNavigator(backStack)
+
+        navigator.switchDrawerDestination(TagKey("idea"))
+
+        assertEquals(listOf(TagKey("idea")), backStack)
+    }
+
+    @Test
+    fun `reselecting current tag does not rebuild its destination`() {
+        val key = TagKey("idea")
+        val backStack = stackOf(key)
+        val navigator = GnomeNavigator(backStack)
+
+        val changed = navigator.switchDrawerDestination(key)
+
+        assertTrue(!changed)
+        assertEquals(listOf(key), backStack)
+    }
+
+    @Test
     fun `goBack pops one entry`() {
         val backStack = stackOf(TimelineKey, SettingsKey)
         val navigator = GnomeNavigator(backStack)
@@ -181,7 +226,7 @@ class GnomeNavigatorTest {
     }
 
     @Test
-    fun `drawer scoping covers memo pages only`() {
+    fun `drawer scoping covers drawer roots and memo child pages`() {
         assertTrue(isDrawerScoped(TimelineKey))
         assertTrue(isDrawerScoped(ArchivedKey))
         assertTrue(isDrawerScoped(TagKey("x")))
@@ -191,11 +236,11 @@ class GnomeNavigatorTest {
         assertTrue(isDrawerScoped(MemoDetailKey("1")))
         assertTrue(isDrawerScoped(EditorKey()))
         assertTrue(!isDrawerScoped(StatsKey))
-        assertTrue(!isDrawerScoped(SettingsKey))
+        assertTrue(isDrawerScoped(SettingsKey))
         assertTrue(!isDrawerScoped(LoginKey))
         assertTrue(!isDrawerScoped(AccountKey("k")))
         assertTrue(!isDrawerScoped(ShareKey))
-        assertTrue(!isDrawerScoped(ResourcesKey))
+        assertTrue(isDrawerScoped(ResourcesKey))
         assertTrue(!isDrawerScoped(AddAccountKey))
         assertTrue(!isDrawerScoped(null))
     }

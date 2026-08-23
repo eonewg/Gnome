@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Edit
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Source
 import androidx.compose.material.icons.outlined.Web
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,7 +59,8 @@ import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsPage(
-    navigator: GnomeNavigator
+    navigator: GnomeNavigator,
+    drawerState: DrawerState? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()
@@ -98,10 +101,14 @@ fun SettingsPage(
             LargeTopAppBar(
                 title = { Text(text = R.string.settings.string) },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        navigator.goBack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
+                    if (drawerState != null) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = R.string.menu.string)
+                        }
+                    } else {
+                        IconButton(onClick = { navigator.goBack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
+                        }
                     }
                 },
                 scrollBehavior = scrollBehavior
