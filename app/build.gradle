@@ -60,6 +60,14 @@ android {
                 signingConfig signingConfigs.release
             }
         }
+        perf {
+            initWith release
+            applicationIdSuffix = ".perf"
+            versionNameSuffix = "-perf"
+            signingConfig = signingConfigs.debug
+            debuggable = false
+            matchingFallbacks = ['release']
+        }
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
