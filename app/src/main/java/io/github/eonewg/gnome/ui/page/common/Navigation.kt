@@ -16,7 +16,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.PermanentDrawerSheet
@@ -144,7 +143,7 @@ fun Navigation() {
     }
     var quickMemoRequestId by remember { mutableStateOf(0L) }
     var memoInputActive by rememberSaveable { mutableStateOf(false) }
-    var drawerNavigationTarget by remember { mutableStateOf<GnomeNavKey?>(null) }
+    var drawerContentHandoff by remember { mutableStateOf<DrawerContentHandoff?>(null) }
     val colors = GnomeDesign.colors
     val currentKey = backStack.lastOrNull() as? GnomeNavKey
 
@@ -152,16 +151,19 @@ fun Navigation() {
         target: GnomeNavKey? = null,
         action: () -> Unit,
     ) {
-        drawerNavigationTarget = target
+        drawerContentHandoff = createDrawerContentHandoff(
+            outgoing = currentKey,
+            incoming = target,
+        )
         action()
         scope.launch {
-            try {
-                drawerState.close()
-            } finally {
-                if (drawerNavigationTarget == target) {
-                    drawerNavigationTarget = null
-                }
-            }
+            drawerState.close()
+        }
+    }
+
+    val finishDrawerContentHandoff: (DrawerContentHandoff) -> Unit = { finished ->
+        if (drawerContentHandoff == finished) {
+            drawerContentHandoff = null
         }
     }
 
@@ -204,21 +206,31 @@ fun Navigation() {
 
     val entryProvider = entryProvider<NavKey> {
         entry<TimelineKey> {
-            TimelineRoute(
-                viewModelStoreOwner = timelineViewModelStoreOwner,
-                drawerState = drawerState,
-                navigator = navigator,
-                quickMemoRequestId = quickMemoRequestId,
-                onMemoInputActiveChange = { memoInputActive = it },
-            )
+            DrawerDestinationContent(
+                key = TimelineKey,
+                handoff = drawerContentHandoff,
+                onHandoffFinished = finishDrawerContentHandoff,
+            ) {
+                TimelineRoute(
+                    viewModelStoreOwner = timelineViewModelStoreOwner,
+                    drawerState = drawerState,
+                    navigator = navigator,
+                    quickMemoRequestId = quickMemoRequestId,
+                    onMemoInputActiveChange = { memoInputActive = it },
+                )
+            }
         }
 
         entry<ArchivedKey> {
-            ArchivedMemoPage(drawerState = drawerState)
+            DrawerDestinationContent(ArchivedKey, drawerContentHandoff, finishDrawerContentHandoff) {
+                ArchivedMemoPage(drawerState = drawerState)
+            }
         }
 
         entry<ExploreKey> {
-            ExplorePage(drawerState = drawerState)
+            DrawerDestinationContent(ExploreKey, drawerContentHandoff, finishDrawerContentHandoff) {
+                ExplorePage(drawerState = drawerState)
+            }
         }
 
         entry<SearchKey> {
@@ -227,11 +239,13 @@ fun Navigation() {
 
         // Reuse one Tag composition so the Scaffold stays stable while only its content animates.
         entry<TagKey>(clazzContentKey = { TagDestinationContentKey }) { key ->
-            TagMemoRoute(
-                drawerState = drawerState,
-                tag = key.tag,
-                navigator = navigator,
-            )
+            DrawerDestinationContent(key, drawerContentHandoff, finishDrawerContentHandoff) {
+                TagMemoRoute(
+                    drawerState = drawerState,
+                    tag = key.tag,
+                    navigator = navigator,
+                )
+            }
         }
 
         entry<DateKey> { key ->
@@ -264,14 +278,18 @@ fun Navigation() {
         }
 
         entry<ResourcesKey> {
-            ResourceListPage(
-                drawerState = drawerState,
-                onBack = { navigator.goBack() },
-            )
+            DrawerDestinationContent(ResourcesKey, drawerContentHandoff, finishDrawerContentHandoff) {
+                ResourceListPage(
+                    drawerState = drawerState,
+                    onBack = { navigator.goBack() },
+                )
+            }
         }
 
         entry<SettingsKey> {
-            SettingsPage(drawerState = drawerState, navigator = navigator)
+            DrawerDestinationContent(SettingsKey, drawerContentHandoff, finishDrawerContentHandoff) {
+                SettingsPage(drawerState = drawerState, navigator = navigator)
+            }
         }
 
         entry<AddAccountKey> {
@@ -302,19 +320,13 @@ fun Navigation() {
         NavDisplay(
             entries = entries,
             onBack = { navigator.goBack() },
-            modifier = Modifier.background(MaterialTheme.colorScheme.surface),
+            modifier = Modifier.background(colors.appBackground),
             transitionSpec = {
                 // The back stack has already changed here, so currentKey is the incoming key.
-                // A Drawer switch lets the sheet/scrim carry the motion; only the incoming
-                // content gets a near-opaque reveal and the outgoing page never fades away.
-                if (drawerNavigationTarget == currentKey) {
-                    fadeIn(
-                        initialAlpha = DrawerDestinationInitialAlpha,
-                        animationSpec = tween(
-                            durationMillis = DrawerDestinationRevealDurationMillis,
-                            easing = FastOutSlowInEasing,
-                        ),
-                    ) togetherWith ExitTransition.None
+                // Drawer handoffs animate the content layers through LocalNavAnimatedContentScope;
+                // NavDisplay itself leaves both destination roots fully opaque.
+                if (drawerContentHandoff?.incoming == currentKey) {
+                    EnterTransition.None togetherWith ExitTransition.None
                 } else if (currentKey is TagKey) {
                     EnterTransition.None togetherWith ExitTransition.None
                 } else if (isDrawerSwitchDestination(currentKey)) {
@@ -475,7 +487,5 @@ fun Navigation() {
 }
 
 private const val TagDestinationContentKey = "TagDestination"
-private const val DrawerDestinationInitialAlpha = 0.95f
-private const val DrawerDestinationRevealDurationMillis = 180
 private const val TopLevelExitDurationMillis = 120
 private const val TopLevelEnterDurationMillis = 180

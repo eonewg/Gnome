@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -54,6 +55,7 @@ import io.github.eonewg.gnome.nav.GnomeNavigator
 import io.github.eonewg.gnome.ui.component.MemosIcon
 import io.github.eonewg.gnome.ui.security.AppLockAuthenticator
 import io.github.eonewg.gnome.ui.security.AppLockSession
+import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,8 +95,15 @@ fun SettingsPage(
         ?.settings
         ?.editGesture
         ?: MemoEditGesture.NONE
+    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
+    val destinationContainerColor = if (drawerContentHandoffActive) {
+        Color.Transparent
+    } else {
+        MaterialTheme.colorScheme.background
+    }
 
     Scaffold(
+        containerColor = destinationContainerColor,
         modifier = Modifier
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -111,7 +120,15 @@ fun SettingsPage(
                         }
                     }
                 },
-                scrollBehavior = scrollBehavior
+                scrollBehavior = scrollBehavior,
+                colors = if (drawerContentHandoffActive) {
+                    TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent,
+                    )
+                } else {
+                    TopAppBarDefaults.topAppBarColors()
+                },
             )
         }
     ) { innerPadding ->

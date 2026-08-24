@@ -70,6 +70,7 @@ import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.component.SyncStatusBadge
 import io.github.eonewg.gnome.ui.page.memos.MemosList
+import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 
 /**
@@ -109,16 +110,18 @@ fun TimelineScreen(
     actions: MemoCardActions,
 ) {
     val colors = GnomeDesign.colors
+    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
+    val destinationContainerColor = if (drawerContentHandoffActive) Color.Transparent else colors.appBackground
     var homeMenuExpanded by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = colors.appBackground,
+        containerColor = destinationContainerColor,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.appBackground,
-                    scrolledContainerColor = colors.appBackground,
+                    containerColor = destinationContainerColor,
+                    scrolledContainerColor = destinationContainerColor,
                 ),
                 title = {
                     if (uiState.selectionMode) {

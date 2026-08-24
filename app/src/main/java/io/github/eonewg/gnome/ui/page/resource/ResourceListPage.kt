@@ -17,12 +17,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
@@ -31,6 +33,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +41,7 @@ import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.MemoImage
+import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
 import io.github.eonewg.gnome.viewmodel.ResourceListViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -60,10 +64,21 @@ fun ResourceListPage(
     var selectedFilter by rememberSaveable { mutableStateOf(ResourceFilter.IMAGE) }
     val imageResources = resources.filter { it.mimeType?.startsWith("image/") == true }
     val otherResources = resources.filterNot { it.mimeType?.startsWith("image/") == true }
+    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
+    val destinationContainerColor = if (drawerContentHandoffActive) {
+        Color.Transparent
+    } else {
+        MaterialTheme.colorScheme.background
+    }
 
     Scaffold(
+        containerColor = destinationContainerColor,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = destinationContainerColor,
+                    scrolledContainerColor = destinationContainerColor,
+                ),
                 title = { Text(text = R.string.resources.string) },
                 navigationIcon = {
                     if (drawerState != null) {

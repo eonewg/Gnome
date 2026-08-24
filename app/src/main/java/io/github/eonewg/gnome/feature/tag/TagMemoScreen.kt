@@ -15,17 +15,21 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.memos.MemosList
+import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +43,12 @@ fun TagMemoScreen(
 ) {
     val scope = rememberCoroutineScope()
     val normalizedCurrentTag = remember(tag) { tag.removePrefix("#") }
+    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
+    val destinationContainerColor = if (drawerContentHandoffActive) {
+        Color.Transparent
+    } else {
+        MaterialTheme.colorScheme.background
+    }
 
     // Never show the previous tag snapshot under the new title while the Room flow switches.
     val matchingUiState = if (uiState.tag == tag) {
@@ -48,8 +58,13 @@ fun TagMemoScreen(
     }
     val contentState = TagContentState(tag = tag, uiState = matchingUiState)
     Scaffold(
+        containerColor = destinationContainerColor,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = destinationContainerColor,
+                    scrolledContainerColor = destinationContainerColor,
+                ),
                 title = { Text(tag) },
                 navigationIcon = {
                     if (drawerState != null) {
