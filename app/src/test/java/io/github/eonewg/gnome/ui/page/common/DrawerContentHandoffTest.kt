@@ -64,4 +64,15 @@ class DrawerContentHandoffTest {
 
         assertTrue(handoff.alphaFor(TagKey("#想法"), isTargetScene = true) == 1f)
     }
+
+    @Test
+    fun `drawer foreground handoff completes before the material drawer settles`() {
+        assertEquals(140, DrawerContentOutgoingDurationMillis)
+        assertEquals(20, DrawerContentIncomingDelayMillis)
+        assertEquals(180, DrawerContentIncomingDurationMillis)
+        assertEquals(
+            200,
+            DrawerContentIncomingDelayMillis + DrawerContentIncomingDurationMillis,
+        )
+    }
 }

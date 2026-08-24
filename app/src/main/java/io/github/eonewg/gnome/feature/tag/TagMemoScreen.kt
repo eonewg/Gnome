@@ -15,7 +15,6 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -29,7 +28,7 @@ import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.memos.MemosList
-import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
+import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,12 +42,6 @@ fun TagMemoScreen(
 ) {
     val scope = rememberCoroutineScope()
     val normalizedCurrentTag = remember(tag) { tag.removePrefix("#") }
-    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
-    val destinationContainerColor = if (drawerContentHandoffActive) {
-        Color.Transparent
-    } else {
-        MaterialTheme.colorScheme.background
-    }
 
     // Never show the previous tag snapshot under the new title while the Room flow switches.
     val matchingUiState = if (uiState.tag == tag) {
@@ -58,17 +51,25 @@ fun TagMemoScreen(
     }
     val contentState = TagContentState(tag = tag, uiState = matchingUiState)
     Scaffold(
-        containerColor = destinationContainerColor,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = destinationContainerColor,
-                    scrolledContainerColor = destinationContainerColor,
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
                 ),
-                title = { Text(tag) },
+                title = {
+                    Text(
+                        text = tag,
+                        modifier = Modifier.drawerForegroundAlpha(),
+                    )
+                },
                 navigationIcon = {
                     if (drawerState != null) {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = { scope.launch { drawerState.open() } },
+                        ) {
                             Icon(Icons.Filled.Menu, contentDescription = R.string.menu.string)
                         }
                     }
@@ -79,7 +80,9 @@ fun TagMemoScreen(
         content = { innerPadding ->
             AnimatedContent(
                 targetState = contentState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawerForegroundAlpha(),
                 transitionSpec = {
                     fadeIn(
                         animationSpec = tween(

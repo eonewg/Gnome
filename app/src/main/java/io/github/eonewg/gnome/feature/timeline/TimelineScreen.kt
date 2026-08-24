@@ -70,7 +70,7 @@ import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.component.SyncStatusBadge
 import io.github.eonewg.gnome.ui.page.memos.MemosList
-import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
+import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 
 /**
@@ -110,47 +110,50 @@ fun TimelineScreen(
     actions: MemoCardActions,
 ) {
     val colors = GnomeDesign.colors
-    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
-    val destinationContainerColor = if (drawerContentHandoffActive) Color.Transparent else colors.appBackground
     var homeMenuExpanded by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
-        containerColor = destinationContainerColor,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = destinationContainerColor,
-                    scrolledContainerColor = destinationContainerColor,
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
                 ),
                 title = {
-                    if (uiState.selectionMode) {
-                        Text(
-                            text = stringResource(R.string.selected_memos_count, uiState.selectedMemoIds.size),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = colors.textPrimary,
-                        )
-                    } else {
-                        HomeTitleMenu(
-                            menuExpanded = homeMenuExpanded,
-                            sortMenuExpanded = sortMenuExpanded,
-                            sortOrder = uiState.sortOrder,
-                            onMenuExpandedChange = { homeMenuExpanded = it },
-                            onSortMenuExpandedChange = { sortMenuExpanded = it },
-                            onEnterSelectionMode = {
-                                homeMenuExpanded = false
-                                onEnterSelectionMode()
-                            },
-                            onSortOrderSelected = { selectedOrder ->
-                                onSortOrderSelected(selectedOrder)
-                                sortMenuExpanded = false
-                            },
-                        )
+                    Box(modifier = Modifier.drawerForegroundAlpha()) {
+                        if (uiState.selectionMode) {
+                            Text(
+                                text = stringResource(R.string.selected_memos_count, uiState.selectedMemoIds.size),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colors.textPrimary,
+                            )
+                        } else {
+                            HomeTitleMenu(
+                                menuExpanded = homeMenuExpanded,
+                                sortMenuExpanded = sortMenuExpanded,
+                                sortOrder = uiState.sortOrder,
+                                onMenuExpandedChange = { homeMenuExpanded = it },
+                                onSortMenuExpandedChange = { sortMenuExpanded = it },
+                                onEnterSelectionMode = {
+                                    homeMenuExpanded = false
+                                    onEnterSelectionMode()
+                                },
+                                onSortOrderSelected = { selectedOrder ->
+                                    onSortOrderSelected(selectedOrder)
+                                    sortMenuExpanded = false
+                                },
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
                     if (!uiState.selectionMode && showNavigationMenu) {
-                        IconButton(onClick = onMenuClick) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = onMenuClick,
+                        ) {
                             Icon(
                                 Icons.Filled.Menu,
                                 contentDescription = R.string.menu.string,
@@ -162,6 +165,7 @@ fun TimelineScreen(
                 actions = {
                     if (uiState.selectionMode) {
                         TextButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
                             enabled = !uiState.batchRunning,
                             onClick = onExitSelectionMode,
                         ) {
@@ -172,14 +176,19 @@ fun TimelineScreen(
                         }
                     } else {
                         if (!uiState.isLocalAccount) {
-                            SyncStatusBadge(
-                                syncing = uiState.syncStatus.syncing,
-                                unsyncedCount = uiState.syncStatus.unsyncedCount,
-                                errorMessage = uiState.syncStatus.errorMessage,
-                                onSync = onSync,
-                            )
+                            Box(modifier = Modifier.drawerForegroundAlpha()) {
+                                SyncStatusBadge(
+                                    syncing = uiState.syncStatus.syncing,
+                                    unsyncedCount = uiState.syncStatus.unsyncedCount,
+                                    errorMessage = uiState.syncStatus.errorMessage,
+                                    onSync = onSync,
+                                )
+                            }
                         }
-                        IconButton(onClick = onSearchClick) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = onSearchClick,
+                        ) {
                             Icon(
                                 Icons.Filled.Search,
                                 contentDescription = R.string.search.string,
@@ -192,17 +201,22 @@ fun TimelineScreen(
         },
         bottomBar = {
             if (uiState.selectionMode) {
-                MemoSelectionBottomBar(
-                    selectionCount = uiState.selectedMemoIds.size,
-                    enabled = !uiState.batchRunning,
-                    onAddTag = onRequestAddTag,
-                    onCopyAll = onCopySelection,
-                    onDelete = onRequestBatchDelete,
-                )
+                Box(modifier = Modifier.drawerForegroundAlpha()) {
+                    MemoSelectionBottomBar(
+                        selectionCount = uiState.selectedMemoIds.size,
+                        enabled = !uiState.batchRunning,
+                        onAddTag = onRequestAddTag,
+                        onCopyAll = onCopySelection,
+                        onDelete = onRequestBatchDelete,
+                    )
+                }
             }
         },
         snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState)
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.drawerForegroundAlpha(),
+            )
         },
         floatingActionButtonPosition = FabPosition.Center,
 
@@ -211,7 +225,8 @@ fun TimelineScreen(
                 Surface(
                     modifier = Modifier
                         .navigationBarsPadding()
-                        .size(60.dp),
+                        .size(60.dp)
+                        .drawerForegroundAlpha(),
                     shape = RoundedCornerShape(18.dp),
                     color = colors.accent,
                     contentColor = colors.cardBackground,
@@ -229,13 +244,10 @@ fun TimelineScreen(
 
         content = { innerPadding ->
             Box(
-                modifier = if (contentAlpha < 1f) {
-                    Modifier
-                        .fillMaxSize()
-                        .alpha(contentAlpha)
-                } else {
-                    Modifier.fillMaxSize()
-                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawerForegroundAlpha()
+                    .then(if (contentAlpha < 1f) Modifier.alpha(contentAlpha) else Modifier),
             ) {
                 MemosList(
                     memos = uiState.memos,

@@ -5,8 +5,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -31,7 +29,15 @@ internal enum class DrawerContentHandoffRole {
     None,
 }
 
-internal val LocalDrawerContentHandoffActive = staticCompositionLocalOf { false }
+private val LocalDrawerForegroundAlpha = staticCompositionLocalOf { 1f }
+
+/** Applies the Drawer handoff only to foreground pixels, never to a page container/background. */
+@Composable
+internal fun Modifier.drawerForegroundAlpha(): Modifier {
+    val foregroundAlpha = LocalDrawerForegroundAlpha.current
+    // Keep the layer present at alpha=1 so clearing the handoff cannot change final rendering.
+    return graphicsLayer { alpha = foregroundAlpha }
+}
 
 internal fun createDrawerContentHandoff(
     outgoing: GnomeNavKey?,
@@ -60,8 +66,8 @@ internal fun DrawerContentHandoff.alphaFor(
 }
 
 /**
- * Animates only a root destination's visual content. The destination Scaffold and app bar make
- * their container colors transparent while this is active, leaving the host background opaque.
+ * Supplies one alpha value to a root destination's foreground slots. The NavDisplay host owns the
+ * opaque background; page Scaffold and app-bar containers never change color during the handoff.
  */
 @Composable
 internal fun DrawerDestinationContent(
@@ -88,7 +94,7 @@ internal fun DrawerDestinationContent(
                 DrawerContentHandoffRole.None -> snap()
             }
         },
-        label = "DrawerDestinationContentAlpha",
+        label = "DrawerForegroundAlpha",
     ) { scene ->
         handoff?.alphaFor(key, isTargetScene = scene == transition.targetState) ?: 1f
     }
@@ -110,17 +116,11 @@ internal fun DrawerDestinationContent(
         }
     }
 
-    CompositionLocalProvider(LocalDrawerContentHandoffActive provides (role != DrawerContentHandoffRole.None)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { this.alpha = alpha },
-        ) {
-            content()
-        }
+    CompositionLocalProvider(LocalDrawerForegroundAlpha provides alpha) {
+        content()
     }
 }
 
-internal const val DrawerContentOutgoingDurationMillis = 190
-internal const val DrawerContentIncomingDurationMillis = 230
-internal const val DrawerContentIncomingDelayMillis = 40
+internal const val DrawerContentOutgoingDurationMillis = 140
+internal const val DrawerContentIncomingDurationMillis = 180
+internal const val DrawerContentIncomingDelayMillis = 20

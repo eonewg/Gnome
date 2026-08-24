@@ -17,7 +17,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -41,7 +40,7 @@ import io.github.eonewg.gnome.R
 import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.MemoImage
-import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
+import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
 import io.github.eonewg.gnome.viewmodel.ResourceListViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -64,29 +63,34 @@ fun ResourceListPage(
     var selectedFilter by rememberSaveable { mutableStateOf(ResourceFilter.IMAGE) }
     val imageResources = resources.filter { it.mimeType?.startsWith("image/") == true }
     val otherResources = resources.filterNot { it.mimeType?.startsWith("image/") == true }
-    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
-    val destinationContainerColor = if (drawerContentHandoffActive) {
-        Color.Transparent
-    } else {
-        MaterialTheme.colorScheme.background
-    }
 
     Scaffold(
-        containerColor = destinationContainerColor,
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = destinationContainerColor,
-                    scrolledContainerColor = destinationContainerColor,
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
                 ),
-                title = { Text(text = R.string.resources.string) },
+                title = {
+                    Text(
+                        text = R.string.resources.string,
+                        modifier = Modifier.drawerForegroundAlpha(),
+                    )
+                },
                 navigationIcon = {
                     if (drawerState != null) {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = { scope.launch { drawerState.open() } },
+                        ) {
                             Icon(Icons.Filled.Menu, contentDescription = R.string.menu.string)
                         }
                     } else {
-                        IconButton(onClick = onBack) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = onBack,
+                        ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
                         }
                     }
@@ -98,6 +102,7 @@ fun ResourceListPage(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .drawerForegroundAlpha()
         ) {
             SingleChoiceSegmentedButtonRow(
                 modifier = Modifier

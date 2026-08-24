@@ -53,9 +53,9 @@ import io.github.eonewg.gnome.nav.AccountKey
 import io.github.eonewg.gnome.nav.AddAccountKey
 import io.github.eonewg.gnome.nav.GnomeNavigator
 import io.github.eonewg.gnome.ui.component.MemosIcon
+import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
 import io.github.eonewg.gnome.ui.security.AppLockAuthenticator
 import io.github.eonewg.gnome.ui.security.AppLockSession
-import io.github.eonewg.gnome.ui.page.common.LocalDrawerContentHandoffActive
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -95,44 +95,48 @@ fun SettingsPage(
         ?.settings
         ?.editGesture
         ?: MemoEditGesture.NONE
-    val drawerContentHandoffActive = LocalDrawerContentHandoffActive.current
-    val destinationContainerColor = if (drawerContentHandoffActive) {
-        Color.Transparent
-    } else {
-        MaterialTheme.colorScheme.background
-    }
 
     Scaffold(
-        containerColor = destinationContainerColor,
+        containerColor = Color.Transparent,
         modifier = Modifier
             .nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
-                title = { Text(text = R.string.settings.string) },
+                title = {
+                    Text(
+                        text = R.string.settings.string,
+                        modifier = Modifier.drawerForegroundAlpha(),
+                    )
+                },
                 navigationIcon = {
                     if (drawerState != null) {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = { scope.launch { drawerState.open() } },
+                        ) {
                             Icon(Icons.Filled.Menu, contentDescription = R.string.menu.string)
                         }
                     } else {
-                        IconButton(onClick = { navigator.goBack() }) {
+                        IconButton(
+                            modifier = Modifier.drawerForegroundAlpha(),
+                            onClick = { navigator.goBack() },
+                        ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = R.string.back.string)
                         }
                     }
                 },
                 scrollBehavior = scrollBehavior,
-                colors = if (drawerContentHandoffActive) {
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                    )
-                } else {
-                    TopAppBarDefaults.topAppBarColors()
-                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent,
+                ),
             )
         }
     ) { innerPadding ->
-        LazyColumn(contentPadding = innerPadding) {
+        LazyColumn(
+            modifier = Modifier.drawerForegroundAlpha(),
+            contentPadding = innerPadding,
+        ) {
             item {
                 Text(
                     R.string.accounts.string,
