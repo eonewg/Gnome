@@ -5,6 +5,7 @@
     <string name="back">返回</string>
     <string name="memos">灵感</string>
     <string name="menu">菜单</string>
+    <string name="close_drawer">关闭导航抽屉</string>
     <string name="search_hint">搜点什么…</string>
     <string name="new_memo">新 MEMO</string>
     <string name="quick_note">速记</string>

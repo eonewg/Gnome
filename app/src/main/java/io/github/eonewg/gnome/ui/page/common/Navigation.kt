@@ -17,11 +17,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.PermanentDrawerSheet
 import androidx.compose.material3.PermanentNavigationDrawer
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -125,7 +123,7 @@ private val ShareContentSaver = listSaver<ShareContent?, Any>(
 @Composable
 fun Navigation() {
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val drawerState = rememberGnomeDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     val backStack = rememberNavBackStack(TimelineKey)
     val navigator = remember { GnomeNavigator(backStack) }
@@ -390,7 +388,7 @@ fun Navigation() {
                 content()
             }
         } else {
-            ModalNavigationDrawer(
+            GnomeModalNavigationDrawer(
                 drawerState = drawerState,
                 gesturesEnabled = isDrawerScoped(currentKey) && !memoInputActive,
                 drawerContent = {

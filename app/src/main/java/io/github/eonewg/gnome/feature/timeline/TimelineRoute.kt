@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -59,6 +58,7 @@ import io.github.eonewg.gnome.nav.MemoDetailKey
 import io.github.eonewg.gnome.nav.SearchKey
 import io.github.eonewg.gnome.nav.TagKey
 import io.github.eonewg.gnome.ui.component.MemoCardActions
+import io.github.eonewg.gnome.ui.page.common.GnomeDrawerState
 import io.github.eonewg.gnome.ui.theme.GnomeDesign
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -66,7 +66,7 @@ import timber.log.Timber
 @Composable
 fun TimelineRoute(
     viewModelStoreOwner: ViewModelStoreOwner,
-    drawerState: DrawerState? = null,
+    drawerState: GnomeDrawerState? = null,
     navigator: GnomeNavigator,
     quickMemoRequestId: Long = 0L,
     onMemoInputActiveChange: (Boolean) -> Unit = {},

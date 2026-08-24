@@ -5,6 +5,7 @@
     <string name="back">Back</string>
     <string name="memos">Memos</string>
     <string name="menu">Menu</string>
+    <string name="close_drawer">Close navigation drawer</string>
     <string name="search_hint">Search…</string>
     <string name="new_memo">New Memo</string>
     <string name="quick_note">Quick Note</string>

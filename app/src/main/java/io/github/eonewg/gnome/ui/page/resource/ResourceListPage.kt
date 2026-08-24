@@ -14,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -41,6 +40,7 @@ import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.Attachment
 import io.github.eonewg.gnome.ui.component.MemoImage
 import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
+import io.github.eonewg.gnome.ui.page.common.GnomeDrawerState
 import io.github.eonewg.gnome.viewmodel.ResourceListViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.lazy.items as lazyItems
@@ -55,7 +55,7 @@ private enum class ResourceFilter {
 @Composable
 fun ResourceListPage(
     onBack: () -> Unit,
-    drawerState: DrawerState? = null,
+    drawerState: GnomeDrawerState? = null,
     viewModel: ResourceListViewModel = hiltViewModel()
 ) {
     val resources by viewModel.resources.collectAsStateWithLifecycle()

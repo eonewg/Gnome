@@ -1,6 +1,6 @@
 package io.github.eonewg.gnome.feature.tag
 
-import androidx.compose.material3.DrawerState
+import io.github.eonewg.gnome.ui.page.common.GnomeDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 /** Registers the per-tag memo list: ViewModel → UiState → Screen wiring. */
 @Composable
 fun TagMemoRoute(
-    drawerState: DrawerState? = null,
+    drawerState: GnomeDrawerState? = null,
     tag: String,
     navigator: GnomeNavigator,
 ) {

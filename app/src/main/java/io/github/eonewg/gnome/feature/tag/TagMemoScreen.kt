@@ -11,7 +11,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,13 +28,14 @@ import io.github.eonewg.gnome.ext.string
 import io.github.eonewg.gnome.ui.component.MemoCardActions
 import io.github.eonewg.gnome.ui.page.memos.MemosList
 import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
+import io.github.eonewg.gnome.ui.page.common.GnomeDrawerState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TagMemoScreen(
     tag: String,
-    drawerState: DrawerState? = null,
+    drawerState: GnomeDrawerState? = null,
     uiState: TagMemoUiState,
     onTagClick: (String) -> Unit,
     actions: MemoCardActions,

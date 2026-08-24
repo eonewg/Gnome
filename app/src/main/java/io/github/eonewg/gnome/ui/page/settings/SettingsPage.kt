@@ -15,7 +15,6 @@ import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material.icons.outlined.Source
 import androidx.compose.material.icons.outlined.Web
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +53,7 @@ import io.github.eonewg.gnome.nav.AddAccountKey
 import io.github.eonewg.gnome.nav.GnomeNavigator
 import io.github.eonewg.gnome.ui.component.MemosIcon
 import io.github.eonewg.gnome.ui.page.common.drawerForegroundAlpha
+import io.github.eonewg.gnome.ui.page.common.GnomeDrawerState
 import io.github.eonewg.gnome.ui.security.AppLockAuthenticator
 import io.github.eonewg.gnome.ui.security.AppLockSession
 import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
@@ -62,7 +62,7 @@ import io.github.eonewg.gnome.feature.account.AccountSessionViewModel
 @Composable
 fun SettingsPage(
     navigator: GnomeNavigator,
-    drawerState: DrawerState? = null,
+    drawerState: GnomeDrawerState? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val accountSessionViewModel: AccountSessionViewModel = hiltViewModel()

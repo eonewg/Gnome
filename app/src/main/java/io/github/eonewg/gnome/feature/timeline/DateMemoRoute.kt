@@ -1,6 +1,6 @@
 package io.github.eonewg.gnome.feature.timeline
 
-import androidx.compose.material3.DrawerState
+import io.github.eonewg.gnome.ui.page.common.GnomeDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -17,7 +17,7 @@ import java.time.LocalDate
 /** Registers the per-date memo list: ViewModel → UiState → Screen wiring. */
 @Composable
 fun DateMemoRoute(
-    drawerState: DrawerState? = null,
+    drawerState: GnomeDrawerState? = null,
     date: LocalDate,
     navigator: GnomeNavigator,
 ) {
